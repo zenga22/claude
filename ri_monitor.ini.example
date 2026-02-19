@@ -1,0 +1,60 @@
+# ri_monitor.ini – AWS Reserved Instances Expiry Monitor configuration
+# -----------------------------------------------------------------------
+# Copy this file to one of the locations below and fill in your values.
+# The first file found is used; later files are ignored.
+#
+#   Search order:
+#     1. Path given with --config on the command line
+#     2. ./ri_monitor.ini            (current working directory)
+#     3. ~/.ri_monitor.ini
+#     4. ~/.config/ri_monitor/ri_monitor.ini
+#
+# Precedence for every option:
+#   CLI flag  >  environment variable (RI_MONITOR_*)  >  this file  >  built-in default
+#
+# Boolean values accept:  true / false / yes / no / 1 / 0  (case-insensitive)
+# List values (regions, recipients) are whitespace- or comma-separated.
+
+[ri_monitor]
+
+# ── Scope ────────────────────────────────────────────────────────────────
+# AWS regions to check.  Omit to use the built-in default (us-east-1).
+#regions = us-east-1 eu-west-1 ap-southeast-1
+
+# Set to true to check every available AWS region (overrides 'regions').
+#all_regions = false
+
+# Number of days before expiry to trigger an alert.
+#days = 30
+
+# AWS CLI named profile to use for credentials.
+#profile =
+
+# ── Email ────────────────────────────────────────────────────────────────
+# Email delivery backend: ses  or  smtp
+#email_backend = ses
+
+# "From" address (must be verified in SES when using the ses backend).
+#sender = alerts@mycompany.com
+
+# One or more recipient addresses, whitespace- or comma-separated.
+#recipients = ops@mycompany.com finance@mycompany.com
+
+# ── AWS SES options ──────────────────────────────────────────────────────
+# AWS region where the SES endpoint lives.
+#ses_region = us-east-1
+
+# ── SMTP options ─────────────────────────────────────────────────────────
+#smtp_host = smtp.gmail.com
+#smtp_port = 587
+#smtp_user  = you@gmail.com
+#smtp_password = your-app-password
+# Set to true to disable STARTTLS (not recommended).
+#smtp_no_tls = false
+
+# ── Misc ─────────────────────────────────────────────────────────────────
+# Print the report to stdout without sending any email.
+#dry_run = false
+
+# Send an email even when no RIs are expiring (useful as a heartbeat).
+#always_send = false

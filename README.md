@@ -8,7 +8,7 @@ A Python script that checks all **EC2 Reserved Instances** across one or more AW
 - Configurable expiry threshold (default 30 days)
 - **Two email backends**: AWS SES or any SMTP server
 - Colour-coded HTML email + plain-text fallback
-- Fully configurable via **CLI flags** or **environment variables**
+- Fully configurable via **CLI flags**, **environment variables**, or an **INI config file**
 - `--dry-run` mode prints the report to stdout without sending mail
 - Suitable for use as a **cron job** or **Lambda function**
 
@@ -87,16 +87,91 @@ All CLI options have environment variable equivalents, which is handy for Lambda
 | `RI_MONITOR_DRY_RUN` | `--dry-run` | `1`/`true`/`yes` to enable |
 | `AWS_PROFILE` | `--profile` | AWS named profile |
 
+## Configuration File (INI)
+
+Instead of (or in addition to) CLI flags and environment variables you can store settings in an INI file.
+
+**Priority order — highest wins:**
+
+```
+CLI flag  >  environment variable  >  INI file  >  built-in default
+```
+
+### Generating a sample file
+
+```bash
+# writes ri_monitor.ini in the current directory
+python ri_monitor.py --write-config
+
+# or write to a custom path
+python ri_monitor.py --write-config ~/.ri_monitor.ini
+```
+
+### Auto-discovery
+
+When `--config` is not specified the script searches these locations in order and uses the first file found:
+
+1. `./ri_monitor.ini` (current working directory)
+2. `~/.ri_monitor.ini`
+3. `~/.config/ri_monitor/ri_monitor.ini`
+
+### Using a specific file
+
+```bash
+python ri_monitor.py --config /etc/ri_monitor/production.ini
+```
+
+### Example INI file
+
+```ini
+[ri_monitor]
+regions    = us-east-1 eu-west-1 ap-southeast-1
+days       = 30
+email_backend = ses
+ses_region = us-east-1
+sender     = alerts@mycompany.com
+recipients = ops@mycompany.com finance@mycompany.com
+```
+
+A fully commented template is available in `ri_monitor.ini.example`.
+
+### INI key reference
+
+| INI key | Equivalent CLI flag | Notes |
+|---|---|---|
+| `regions` | `--regions` | Space- or comma-separated |
+| `all_regions` | `--all-regions` | Boolean |
+| `days` | `--days` | Integer |
+| `profile` | `--profile` | AWS named profile |
+| `email_backend` | `--email-backend` | `ses` or `smtp` |
+| `sender` | `--sender` | |
+| `recipients` | `--recipients` | Space- or comma-separated |
+| `ses_region` | `--ses-region` | |
+| `smtp_host` | `--smtp-host` | |
+| `smtp_port` | `--smtp-port` | Integer |
+| `smtp_user` | `--smtp-user` | |
+| `smtp_password` | `--smtp-password` | |
+| `smtp_no_tls` | `--smtp-no-tls` | Boolean |
+| `dry_run` | `--dry-run` | Boolean |
+| `always_send` | `--always-send` | Boolean |
+
 ## Scheduling with Cron
 
 Run once a day at 08:00:
 
+Put your settings in `/etc/ri_monitor.ini` (see the INI section above), then:
+
 ```cron
 0 8 * * * /usr/bin/python3 /opt/ri_monitor/ri_monitor.py \
-  --regions us-east-1 eu-west-1 \
-  --days 30 \
-  --email-backend ses \
-  --sender alerts@mycompany.com \
+  --config /etc/ri_monitor.ini >> /var/log/ri_monitor.log 2>&1
+```
+
+Or keep everything on one line without a config file:
+
+```cron
+0 8 * * * /usr/bin/python3 /opt/ri_monitor/ri_monitor.py \
+  --regions us-east-1 eu-west-1 --days 30 \
+  --email-backend ses --sender alerts@mycompany.com \
   --recipients ops@mycompany.com >> /var/log/ri_monitor.log 2>&1
 ```
 

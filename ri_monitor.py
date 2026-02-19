@@ -9,42 +9,162 @@ Email delivery supports two backends:
   - AWS SES  (recommended for production)
   - SMTP     (any mail server, e.g. Gmail, SendGrid, self-hosted)
 
+Configuration priority (highest → lowest):
+  1. CLI flags
+  2. Environment variables  (RI_MONITOR_*)
+  3. INI config file        (ri_monitor.ini or path from --config)
+  4. Built-in defaults
+
 Usage:
-    python ri_monitor.py [--regions us-east-1 eu-west-1] [--days 30]
+    python ri_monitor.py [--config /path/to/ri_monitor.ini]
+                         [--regions us-east-1 eu-west-1] [--days 30]
                          [--sender from@example.com] [--recipients a@b.com c@d.com]
                          [--email-backend ses|smtp]
                          [--smtp-host HOST] [--smtp-port 587]
                          [--smtp-user USER] [--smtp-password PASS]
                          [--dry-run]
+                         [--write-config [PATH]]   # generate a sample INI file
 
-All options can also be supplied via environment variables (see CONFIG section).
+All options can also be supplied via environment variables or an INI config file.
 """
 
 import argparse
+import configparser
 import os
 import smtplib
 import sys
 from datetime import datetime, timezone
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 import boto3
 from botocore.exceptions import BotoCoreError, ClientError
 
 
 # ---------------------------------------------------------------------------
-# Configuration defaults (override via CLI args or environment variables)
+# Configuration defaults (override via config file, env vars, or CLI args)
 # ---------------------------------------------------------------------------
 
 DEFAULT_REGIONS: List[str] = ["us-east-1"]
 DEFAULT_DAYS_THRESHOLD: int = 30
 DEFAULT_EMAIL_BACKEND: str = "ses"   # "ses" or "smtp"
 DEFAULT_SMTP_PORT: int = 587
+INI_SECTION: str = "ri_monitor"
+
+# Candidate paths searched in order when --config is not specified.
+DEFAULT_CONFIG_PATHS: List[str] = [
+    "ri_monitor.ini",
+    os.path.expanduser("~/.ri_monitor.ini"),
+    os.path.expanduser("~/.config/ri_monitor/ri_monitor.ini"),
+]
 
 
 def get_env(key: str, default=None):
     return os.environ.get(key, default)
+
+
+# ---------------------------------------------------------------------------
+# INI config file support
+# ---------------------------------------------------------------------------
+
+def load_ini_config(path: Optional[str] = None) -> Dict[str, str]:
+    """Read the [ri_monitor] section from an INI file and return it as a dict.
+
+    If *path* is None the DEFAULT_CONFIG_PATHS list is searched and the first
+    existing file is used.  Missing files are silently ignored unless a path
+    was explicitly requested via --config, in which case an error is raised.
+    """
+    explicit = path is not None
+    candidates = [path] if explicit else DEFAULT_CONFIG_PATHS
+
+    chosen: Optional[str] = None
+    for candidate in candidates:
+        if os.path.isfile(candidate):
+            chosen = candidate
+            break
+
+    if chosen is None:
+        if explicit:
+            print(f"ERROR: config file not found: {path}", file=sys.stderr)
+            sys.exit(1)
+        return {}   # no config file – silently proceed with defaults
+
+    parser = configparser.ConfigParser()
+    try:
+        parser.read(chosen)
+    except configparser.Error as exc:
+        print(f"ERROR: could not parse config file {chosen!r}: {exc}", file=sys.stderr)
+        sys.exit(1)
+
+    if INI_SECTION not in parser:
+        print(
+            f"[WARN] Config file {chosen!r} has no [{INI_SECTION}] section – ignored.",
+            file=sys.stderr,
+        )
+        return {}
+
+    print(f"Config  : loaded from {chosen}")
+    return dict(parser[INI_SECTION])
+
+
+def write_sample_config(dest: str) -> None:
+    """Write a fully-commented sample INI config file to *dest*."""
+    sample = f"""\
+# ri_monitor.ini – AWS Reserved Instances Expiry Monitor configuration
+# -----------------------------------------------------------------------
+# All keys are optional.  Precedence: CLI flags > env vars > this file.
+# Boolean values accept: true/false, yes/no, 1/0  (case-insensitive).
+# Lists (regions, recipients) are whitespace- or comma-separated.
+
+[{INI_SECTION}]
+
+# ── Scope ───────────────────────────────────────────────────────────────
+# AWS regions to check.  Space- or comma-separated.
+# Omit (or leave blank) to use the built-in default ({" ".join(DEFAULT_REGIONS)}).
+#regions = us-east-1 eu-west-1 ap-southeast-1
+
+# Set to true to check every available AWS region (overrides 'regions').
+#all_regions = false
+
+# Number of days before expiry to trigger an alert.
+#days = {DEFAULT_DAYS_THRESHOLD}
+
+# AWS CLI named profile to use for credentials.
+#profile =
+
+# ── Email ────────────────────────────────────────────────────────────────
+# Email delivery backend: ses  or  smtp
+#email_backend = {DEFAULT_EMAIL_BACKEND}
+
+# "From" address (must be verified in SES when using the ses backend).
+#sender = alerts@mycompany.com
+
+# One or more recipient addresses, space- or comma-separated.
+#recipients = ops@mycompany.com finance@mycompany.com
+
+# ── AWS SES options ──────────────────────────────────────────────────────
+# AWS region where the SES endpoint lives.
+#ses_region = us-east-1
+
+# ── SMTP options ─────────────────────────────────────────────────────────
+#smtp_host = smtp.gmail.com
+#smtp_port = {DEFAULT_SMTP_PORT}
+#smtp_user = you@gmail.com
+#smtp_password = your-app-password
+# Set to true to disable STARTTLS (not recommended).
+#smtp_no_tls = false
+
+# ── Misc ─────────────────────────────────────────────────────────────────
+# Print the report to stdout without sending any email.
+#dry_run = false
+
+# Send an email even when no RIs are expiring (useful as a heartbeat).
+#always_send = false
+"""
+    with open(dest, "w") as fh:
+        fh.write(sample)
+    print(f"Sample config written to: {dest}")
 
 
 # ---------------------------------------------------------------------------
@@ -306,72 +426,156 @@ def send_via_smtp(
 # CLI
 # ---------------------------------------------------------------------------
 
+def _ini_bool(ini: Dict[str, str], key: str, default: bool) -> bool:
+    """Return a boolean from the INI dict, honouring true/false/yes/no/1/0."""
+    raw = ini.get(key)
+    if raw is None:
+        return default
+    return raw.strip().lower() in ("1", "true", "yes")
+
+
+def _ini_list(ini: Dict[str, str], key: str, default: List[str]) -> List[str]:
+    """Return a list from the INI dict (whitespace- or comma-separated)."""
+    raw = ini.get(key)
+    if not raw:
+        return default
+    # Accept both "a b c" and "a, b, c" and mixed formats.
+    return [item.strip() for item in raw.replace(",", " ").split() if item.strip()]
+
+
 def parse_args() -> argparse.Namespace:
+    # ── Step 1: pre-parse only --config and --write-config ──────────────
+    # We need --config before building the main parser so that INI values
+    # can be used as defaults.  add_help=False avoids duplicate -h output.
+    pre = argparse.ArgumentParser(add_help=False)
+    pre.add_argument("--config", default=None, metavar="PATH")
+    pre.add_argument("--write-config", nargs="?", const="ri_monitor.ini", metavar="PATH")
+    pre_args, _ = pre.parse_known_args()
+
+    # Handle --write-config early so it works even without AWS credentials.
+    if pre_args.write_config is not None:
+        write_sample_config(pre_args.write_config)
+        sys.exit(0)
+
+    # ── Step 2: load INI file ────────────────────────────────────────────
+    ini = load_ini_config(pre_args.config)
+
+    # ── Step 3: helper that applies the priority chain ───────────────────
+    # Priority: env var > INI value > hardcoded default
+    # (CLI flags are applied last by argparse itself, winning over all defaults.)
+    def cfg(env_key: str, ini_key: str, default=None):
+        env_val = os.environ.get(env_key)
+        if env_val is not None:
+            return env_val
+        ini_val = ini.get(ini_key)
+        if ini_val is not None:
+            return ini_val
+        return default
+
+    def cfg_int(env_key: str, ini_key: str, default: int) -> int:
+        return int(cfg(env_key, ini_key, default))
+
+    def cfg_bool(env_key: str, ini_key: str, default: bool) -> bool:
+        env_val = os.environ.get(env_key)
+        if env_val is not None:
+            return env_val.lower() in ("1", "true", "yes")
+        return _ini_bool(ini, ini_key, default)
+
+    def cfg_list(env_key: str, ini_key: str, default: List[str]) -> List[str]:
+        env_val = os.environ.get(env_key, "").split()
+        if env_val:
+            return env_val
+        return _ini_list(ini, ini_key, default)
+
+    # ── Step 4: build the full parser with resolved defaults ─────────────
     parser = argparse.ArgumentParser(
         description="Monitor AWS Reserved Instances and alert by email before expiry.",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+        parents=[pre],
     )
 
     # Scope
     parser.add_argument(
         "--regions", nargs="*",
-        default=get_env("RI_MONITOR_REGIONS", "").split() or DEFAULT_REGIONS,
+        default=cfg_list("RI_MONITOR_REGIONS", "regions", DEFAULT_REGIONS),
         help="AWS region(s) to check. Pass no value to check ALL regions.",
     )
     parser.add_argument(
         "--all-regions", action="store_true",
+        default=cfg_bool("", "all_regions", False),
         help="Check every available AWS region (overrides --regions).",
     )
     parser.add_argument(
         "--days", type=int,
-        default=int(get_env("RI_MONITOR_DAYS", DEFAULT_DAYS_THRESHOLD)),
+        default=cfg_int("RI_MONITOR_DAYS", "days", DEFAULT_DAYS_THRESHOLD),
         help="Alert threshold in days before expiry.",
     )
     parser.add_argument(
         "--profile",
-        default=get_env("AWS_PROFILE"),
+        default=cfg("AWS_PROFILE", "profile"),
         help="AWS CLI named profile to use.",
     )
 
     # Email
     parser.add_argument(
         "--sender",
-        default=get_env("RI_MONITOR_SENDER"),
+        default=cfg("RI_MONITOR_SENDER", "sender"),
         help="From address for the alert email.",
     )
     parser.add_argument(
         "--recipients", nargs="+",
-        default=get_env("RI_MONITOR_RECIPIENTS", "").split() or [],
+        default=cfg_list("RI_MONITOR_RECIPIENTS", "recipients", []),
         help="Recipient email address(es).",
     )
     parser.add_argument(
         "--email-backend", choices=["ses", "smtp"],
-        default=get_env("RI_MONITOR_EMAIL_BACKEND", DEFAULT_EMAIL_BACKEND),
+        default=cfg("RI_MONITOR_EMAIL_BACKEND", "email_backend", DEFAULT_EMAIL_BACKEND),
         help="Email delivery method.",
     )
 
     # SES
     parser.add_argument(
         "--ses-region",
-        default=get_env("RI_MONITOR_SES_REGION", "us-east-1"),
+        default=cfg("RI_MONITOR_SES_REGION", "ses_region", "us-east-1"),
         help="AWS region for the SES endpoint.",
     )
 
     # SMTP
-    parser.add_argument("--smtp-host", default=get_env("RI_MONITOR_SMTP_HOST"), help="SMTP server hostname.")
-    parser.add_argument("--smtp-port", type=int, default=int(get_env("RI_MONITOR_SMTP_PORT", DEFAULT_SMTP_PORT)), help="SMTP server port.")
-    parser.add_argument("--smtp-user", default=get_env("RI_MONITOR_SMTP_USER"), help="SMTP login username.")
-    parser.add_argument("--smtp-password", default=get_env("RI_MONITOR_SMTP_PASSWORD"), help="SMTP login password.")
-    parser.add_argument("--smtp-no-tls", action="store_true", help="Disable STARTTLS for SMTP.")
+    parser.add_argument(
+        "--smtp-host",
+        default=cfg("RI_MONITOR_SMTP_HOST", "smtp_host"),
+        help="SMTP server hostname.",
+    )
+    parser.add_argument(
+        "--smtp-port", type=int,
+        default=cfg_int("RI_MONITOR_SMTP_PORT", "smtp_port", DEFAULT_SMTP_PORT),
+        help="SMTP server port.",
+    )
+    parser.add_argument(
+        "--smtp-user",
+        default=cfg("RI_MONITOR_SMTP_USER", "smtp_user"),
+        help="SMTP login username.",
+    )
+    parser.add_argument(
+        "--smtp-password",
+        default=cfg("RI_MONITOR_SMTP_PASSWORD", "smtp_password"),
+        help="SMTP login password.",
+    )
+    parser.add_argument(
+        "--smtp-no-tls", action="store_true",
+        default=cfg_bool("", "smtp_no_tls", False),
+        help="Disable STARTTLS for SMTP.",
+    )
 
     # Misc
     parser.add_argument(
         "--dry-run", action="store_true",
-        default=get_env("RI_MONITOR_DRY_RUN", "").lower() in ("1", "true", "yes"),
+        default=cfg_bool("RI_MONITOR_DRY_RUN", "dry_run", False),
         help="Print report to stdout without sending email.",
     )
     parser.add_argument(
         "--always-send", action="store_true",
+        default=cfg_bool("", "always_send", False),
         help="Send email even when no RIs are expiring (useful for health checks).",
     )
 
