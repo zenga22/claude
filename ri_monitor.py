@@ -42,6 +42,8 @@ import boto3
 from botocore.exceptions import BotoCoreError, ClientError
 
 
+__version__ = "1.0.0"
+
 # ---------------------------------------------------------------------------
 # Configuration defaults (override via config file, env vars, or CLI args)
 # ---------------------------------------------------------------------------
@@ -524,6 +526,7 @@ def parse_args() -> argparse.Namespace:
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
         parents=[pre],
     )
+    parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
 
     # Scope
     parser.add_argument(
