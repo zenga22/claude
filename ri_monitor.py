@@ -280,11 +280,12 @@ def collect_expiring(
 # Email composition
 # ---------------------------------------------------------------------------
 
-def build_plain_text(expiring: List[ReservedInstance], days_threshold: int) -> str:
+def build_plain_text(expiring: List[ReservedInstance], days_threshold: int, profile: Optional[str] = None) -> str:
     lines = [
         f"AWS Reserved Instances Expiry Report",
         f"Generated: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}",
         f"Threshold: {days_threshold} days",
+        f"Profile  : {profile or 'default'}",
         "",
         f"{'Region':<20} {'Type':<15} {'Count':>5} {'Platform':<20} {'Scope':<12} {'AZ':<15} {'Expires':<12} {'Days Left':>10}",
         "-" * 115,
@@ -304,8 +305,9 @@ def build_plain_text(expiring: List[ReservedInstance], days_threshold: int) -> s
     return "\n".join(lines)
 
 
-def build_html(expiring: List[ReservedInstance], days_threshold: int) -> str:
+def build_html(expiring: List[ReservedInstance], days_threshold: int, profile: Optional[str] = None) -> str:
     now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    profile_str = profile or "default"
     rows = ""
     for ri in sorted(expiring, key=lambda r: (r.days_remaining or 0)):
         days = ri.days_remaining
@@ -350,7 +352,7 @@ def build_html(expiring: List[ReservedInstance], days_threshold: int) -> str:
 </head>
 <body>
   <h2>&#9888; AWS Reserved Instances Expiry Report</h2>
-  <p>Generated: <strong>{now_str}</strong> &nbsp;|&nbsp; Threshold: <strong>{days_threshold} days</strong></p>
+  <p>Generated: <strong>{now_str}</strong> &nbsp;|&nbsp; Threshold: <strong>{days_threshold} days</strong> &nbsp;|&nbsp; Profile: <strong>{profile_str}</strong></p>
   <div class="warning">
     <strong>{len(expiring)}</strong> Reserved Instance(s) will expire within {days_threshold} days.
     Review and renew them to avoid on-demand pricing.
@@ -378,6 +380,7 @@ def compose_email(
     recipients: List[str],
     expiring: List[ReservedInstance],
     days_threshold: int,
+    profile: Optional[str] = None,
 ) -> MIMEMultipart:
     count = len(expiring)
     subject = f"[AWS] {count} Reserved Instance(s) expiring within {days_threshold} days"
@@ -387,8 +390,8 @@ def compose_email(
     msg["From"] = sender
     msg["To"] = ", ".join(recipients)
 
-    plain = build_plain_text(expiring, days_threshold)
-    html = build_html(expiring, days_threshold)
+    plain = build_plain_text(expiring, days_threshold, profile)
+    html = build_html(expiring, days_threshold, profile)
 
     msg.attach(MIMEText(plain, "plain"))
     msg.attach(MIMEText(html, "html"))
@@ -635,6 +638,7 @@ def main():
     print(f"\n=== AWS Reserved Instances Expiry Monitor ===")
     print(f"Threshold : {args.days} days")
     print(f"Regions   : {'ALL' if not regions else ', '.join(regions)}")
+    print(f"Profile   : {args.profile or 'default'}")
     print(f"Backend   : {args.email_backend}")
     print(f"Dry-run   : {args.dry_run}\n")
 
@@ -668,7 +672,7 @@ def main():
     # 3. Compose message
     sender = args.sender or "ri-monitor@example.com"
     recipients = args.recipients or ["ops@example.com"]
-    msg = compose_email(sender, recipients, expiring, args.days)
+    msg = compose_email(sender, recipients, expiring, args.days, args.profile)
 
     # 4. Deliver or print
     if args.dry_run:
