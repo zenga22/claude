@@ -67,7 +67,7 @@ python ri_monitor.py \
 python ri_monitor.py \
   --days 30 \
   --email-backend smtp \
-  --smtp-ssl \
+  --smtp-security ssl \
   --smtp-host smtp.gmail.com \
   --smtp-user you@gmail.com \
   --smtp-password "app-password" \
@@ -95,7 +95,7 @@ All CLI options have environment variable equivalents, which is handy for Lambda
 | `RI_MONITOR_SES_REGION` | `--ses-region` | SES endpoint region |
 | `RI_MONITOR_SMTP_HOST` | `--smtp-host` | SMTP hostname |
 | `RI_MONITOR_SMTP_PORT` | `--smtp-port` | SMTP port |
-| `RI_MONITOR_SMTP_SSL` | `--smtp-ssl` | `1`/`true`/`yes` for implicit SSL/TLS |
+| `RI_MONITOR_SMTP_SECURITY` | `--smtp-security` | `ssl`, `tls`, or `none` |
 | `RI_MONITOR_SMTP_USER` | `--smtp-user` | SMTP username |
 | `RI_MONITOR_SMTP_PASSWORD` | `--smtp-password` | SMTP password |
 | `RI_MONITOR_DRY_RUN` | `--dry-run` | `1`/`true`/`yes` to enable |
@@ -162,9 +162,8 @@ A fully commented template is available in `ri_monitor.ini.example`.
 | `recipients` | `--recipients` | Space- or comma-separated |
 | `ses_region` | `--ses-region` | |
 | `smtp_host` | `--smtp-host` | |
-| `smtp_port` | `--smtp-port` | Integer; default 587 (STARTTLS) or 465 (SSL) |
-| `smtp_ssl` | `--smtp-ssl` | Boolean; implicit SSL/TLS (SMTPS, port 465) |
-| `smtp_no_tls` | `--smtp-no-tls` | Boolean; plain connection, no encryption |
+| `smtp_port` | `--smtp-port` | Integer; default 587 (`tls`) or 465 (`ssl`) |
+| `smtp_security` | `--smtp-security` | `tls` (default), `ssl`, or `none` |
 | `smtp_user` | `--smtp-user` | |
 | `smtp_password` | `--smtp-password` | |
 | `dry_run` | `--dry-run` | Boolean |

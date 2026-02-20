@@ -47,14 +47,13 @@
 # ── SMTP options ─────────────────────────────────────────────────────────
 #smtp_host = smtp.gmail.com
 
-# Connection security — uncomment ONE of the two lines below, or leave
-# both commented to use the default (STARTTLS, port 587).
-#
-#smtp_ssl    = true    # implicit SSL/TLS (SMTPS), typical port 465
-#smtp_no_tls = true    # plain/unencrypted connection (not recommended)
+# Connection security mode — one of: tls (default), ssl, none
+#   tls  → STARTTLS upgrade          (default port 587)
+#   ssl  → implicit SSL/TLS (SMTPS)  (default port 465)
+#   none → plain/unencrypted         (not recommended)
+#smtp_security = tls
 
-# Port is auto-selected from the security mode when omitted:
-#   STARTTLS → 587, SMTPS/SSL → 465
+# Port is auto-selected from the security mode when omitted.
 #smtp_port =
 
 #smtp_user     = you@gmail.com
