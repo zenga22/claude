@@ -39,7 +39,7 @@ from email.mime.text import MIMEText
 from typing import Dict, List, Optional
 
 import boto3
-from botocore.exceptions import BotoCoreError, ClientError
+from botocore.exceptions import BotoCoreError, ClientError, ProfileNotFound
 
 
 __version__ = "1.0.0"
@@ -255,11 +255,30 @@ def collect_expiring(
     profile: Optional[str] = None,
 ) -> List[ReservedInstance]:
     """Gather all RIs expiring within *days_threshold* days across given regions."""
-    session = boto3.Session(profile_name=profile) if profile else boto3.Session()
+    try:
+        session = boto3.Session(profile_name=profile) if profile else boto3.Session()
+    except ProfileNotFound:
+        print(
+            f"ERROR: AWS profile {profile!r} not found. "
+            "Check ~/.aws/config or the AWS_PROFILE environment variable.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    except BotoCoreError as exc:
+        print(f"ERROR: failed to create AWS session: {exc}", file=sys.stderr)
+        sys.exit(1)
 
     if not regions:
         print("Discovering all AWS regions …")
-        regions = get_all_regions(session)
+        try:
+            regions = get_all_regions(session)
+        except ClientError as exc:
+            code = exc.response["Error"]["Code"]
+            print(f"ERROR: could not list AWS regions: {code} — {exc}", file=sys.stderr)
+            sys.exit(1)
+        except BotoCoreError as exc:
+            print(f"ERROR: could not list AWS regions: {exc}", file=sys.stderr)
+            sys.exit(1)
         print(f"Found {len(regions)} regions.")
 
     expiring: List[ReservedInstance] = []
