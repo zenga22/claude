@@ -49,7 +49,8 @@ from botocore.exceptions import BotoCoreError, ClientError
 DEFAULT_REGIONS: List[str] = ["us-east-1"]
 DEFAULT_DAYS_THRESHOLD: int = 30
 DEFAULT_EMAIL_BACKEND: str = "ses"   # "ses" or "smtp"
-DEFAULT_SMTP_PORT: int = 587
+DEFAULT_SMTP_PORT: int = 587         # STARTTLS
+DEFAULT_SMTP_SSL_PORT: int = 465     # implicit SSL/TLS
 INI_SECTION: str = "ri_monitor"
 
 # Candidate paths searched in order when --config is not specified.
@@ -149,11 +150,22 @@ def write_sample_config(dest: str) -> None:
 
 # ── SMTP options ─────────────────────────────────────────────────────────
 #smtp_host = smtp.gmail.com
-#smtp_port = {DEFAULT_SMTP_PORT}
+
+# Connection security — choose ONE of the three modes:
+#
+#   smtp_ssl = true   → implicit SSL/TLS via SMTPS  (default port {DEFAULT_SMTP_SSL_PORT})
+#   smtp_no_tls = true → plain connection, no encryption  (not recommended)
+#   (neither)          → STARTTLS upgrade             (default port {DEFAULT_SMTP_PORT})
+#
+#smtp_ssl = false
+#smtp_no_tls = false
+
+# Port is inferred from the security mode when not set:
+#   STARTTLS → {DEFAULT_SMTP_PORT}, SMTPS/SSL → {DEFAULT_SMTP_SSL_PORT}
+#smtp_port =
+
 #smtp_user = you@gmail.com
 #smtp_password = your-app-password
-# Set to true to disable STARTTLS (not recommended).
-#smtp_no_tls = false
 
 # ── Misc ─────────────────────────────────────────────────────────────────
 # Print the report to stdout without sending any email.
@@ -411,15 +423,31 @@ def send_via_smtp(
     port: int,
     username: Optional[str],
     password: Optional[str],
+    use_ssl: bool = False,
     use_tls: bool = True,
 ):
-    with smtplib.SMTP(host, port) as server:
-        if use_tls:
-            server.starttls()
-        if username and password:
-            server.login(username, password)
-        server.sendmail(sender, recipients, msg.as_string())
-    print(f"Email sent via SMTP ({host}:{port}) to: {', '.join(recipients)}")
+    """Send *msg* via SMTP.
+
+    Connection modes (mutually exclusive, evaluated in order):
+      use_ssl=True  – implicit SSL/TLS via smtplib.SMTP_SSL (typical port 465)
+      use_tls=True  – plain connection upgraded with STARTTLS  (typical port 587)
+      both False    – plain/unencrypted connection (not recommended)
+    """
+    if use_ssl:
+        ctx = __import__("ssl").create_default_context()
+        with smtplib.SMTP_SSL(host, port, context=ctx) as server:
+            if username and password:
+                server.login(username, password)
+            server.sendmail(sender, recipients, msg.as_string())
+    else:
+        with smtplib.SMTP(host, port) as server:
+            if use_tls:
+                server.starttls()
+            if username and password:
+                server.login(username, password)
+            server.sendmail(sender, recipients, msg.as_string())
+    mode = "SMTPS/SSL" if use_ssl else ("SMTP+STARTTLS" if use_tls else "SMTP")
+    print(f"Email sent via {mode} ({host}:{port}) to: {', '.join(recipients)}")
 
 
 # ---------------------------------------------------------------------------
@@ -546,10 +574,23 @@ def parse_args() -> argparse.Namespace:
         default=cfg("RI_MONITOR_SMTP_HOST", "smtp_host"),
         help="SMTP server hostname.",
     )
+    _raw_smtp_port = cfg("RI_MONITOR_SMTP_PORT", "smtp_port")
     parser.add_argument(
         "--smtp-port", type=int,
-        default=cfg_int("RI_MONITOR_SMTP_PORT", "smtp_port", DEFAULT_SMTP_PORT),
-        help="SMTP server port.",
+        default=int(_raw_smtp_port) if _raw_smtp_port else None,
+        help=(
+            f"SMTP server port. Defaults to {DEFAULT_SMTP_PORT} for STARTTLS "
+            f"or {DEFAULT_SMTP_SSL_PORT} when --smtp-ssl is set."
+        ),
+    )
+    parser.add_argument(
+        "--smtp-ssl", action="store_true",
+        default=cfg_bool("RI_MONITOR_SMTP_SSL", "smtp_ssl", False),
+        help=(
+            "Use implicit SSL/TLS (SMTPS) instead of STARTTLS. "
+            f"Typical port: {DEFAULT_SMTP_SSL_PORT}. "
+            "Mutually exclusive with --smtp-no-tls."
+        ),
     )
     parser.add_argument(
         "--smtp-user",
@@ -617,6 +658,12 @@ def main():
         if args.email_backend == "smtp" and not args.smtp_host:
             print("ERROR: --smtp-host is required when using the smtp backend.", file=sys.stderr)
             sys.exit(1)
+        if args.email_backend == "smtp" and args.smtp_ssl and args.smtp_no_tls:
+            print("ERROR: --smtp-ssl and --smtp-no-tls are mutually exclusive.", file=sys.stderr)
+            sys.exit(1)
+
+    # Resolve SMTP port: explicit > ssl-aware default
+    smtp_port = args.smtp_port or (DEFAULT_SMTP_SSL_PORT if args.smtp_ssl else DEFAULT_SMTP_PORT)
 
     # 3. Compose message
     sender = args.sender or "ri-monitor@example.com"
@@ -639,9 +686,10 @@ def main():
             send_via_smtp(
                 msg, sender, recipients,
                 host=args.smtp_host,
-                port=args.smtp_port,
+                port=smtp_port,
                 username=args.smtp_user,
                 password=args.smtp_password,
+                use_ssl=args.smtp_ssl,
                 use_tls=not args.smtp_no_tls,
             )
     except (ClientError, BotoCoreError) as exc:

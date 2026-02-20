@@ -46,11 +46,19 @@
 
 # ── SMTP options ─────────────────────────────────────────────────────────
 #smtp_host = smtp.gmail.com
-#smtp_port = 587
-#smtp_user  = you@gmail.com
+
+# Connection security — uncomment ONE of the two lines below, or leave
+# both commented to use the default (STARTTLS, port 587).
+#
+#smtp_ssl    = true    # implicit SSL/TLS (SMTPS), typical port 465
+#smtp_no_tls = true    # plain/unencrypted connection (not recommended)
+
+# Port is auto-selected from the security mode when omitted:
+#   STARTTLS → 587, SMTPS/SSL → 465
+#smtp_port =
+
+#smtp_user     = you@gmail.com
 #smtp_password = your-app-password
-# Set to true to disable STARTTLS (not recommended).
-#smtp_no_tls = false
 
 # ── Misc ─────────────────────────────────────────────────────────────────
 # Print the report to stdout without sending any email.
