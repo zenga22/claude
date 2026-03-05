@@ -105,6 +105,7 @@ function db_migrate(PDO $pdo): void {
             'check_interval'=> '60',
             'retain_days'   => '30',
             'site_name'     => 'Network Monitor',
+            'timezone'      => 'UTC',
         ];
         $stmt = $pdo->prepare("INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)");
         foreach ($defaults as $k => $v) $stmt->execute([$k, $v]);
@@ -116,6 +117,11 @@ function setting(string $key, string $default = ''): string {
     if ($cache === null) {
         $rows  = db_connect()->query("SELECT key, value FROM settings")->fetchAll();
         $cache = array_column($rows, 'value', 'key');
+        // Apply timezone globally as soon as settings are first loaded
+        $tz = $cache['timezone'] ?? 'UTC';
+        if ($tz && @date_default_timezone_set($tz) === false) {
+            date_default_timezone_set('UTC');
+        }
     }
     return $cache[$key] ?? $default;
 }

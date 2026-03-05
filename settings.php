@@ -13,7 +13,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $act = $_POST['action'] ?? '';
 
     if ($act === 'save_settings') {
-        $fields = ['smtp_host','smtp_port','smtp_user','smtp_pass','smtp_from','smtp_from_name','smtp_secure','retain_days','site_name'];
+        $fields = ['smtp_host','smtp_port','smtp_user','smtp_pass','smtp_from','smtp_from_name','smtp_secure','retain_days','site_name','timezone'];
         foreach ($fields as $f) {
             if (isset($_POST[$f])) {
                 setting_set($f, trim($_POST[$f]));
@@ -78,6 +78,18 @@ include __DIR__ . '/includes/header.php';
       <div class="col-md-6">
         <label class="form-label fw-semibold">Site Name</label>
         <input type="text" name="site_name" class="form-control" value="<?= htmlspecialchars(setting('site_name','Network Monitor')) ?>">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label fw-semibold">Timezone</label>
+        <select name="timezone" class="form-select">
+          <?php
+          $currentTz = setting('timezone', 'UTC');
+          foreach (DateTimeZone::listIdentifiers() as $tz):
+          ?>
+          <option value="<?= $tz ?>" <?= $currentTz === $tz ? 'selected' : '' ?>><?= $tz ?></option>
+          <?php endforeach; ?>
+        </select>
+        <div class="form-text">Current time: <?= date('Y-m-d H:i:s') ?></div>
       </div>
       <div class="col-md-3">
         <label class="form-label fw-semibold">Retain History (days)</label>
