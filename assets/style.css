@@ -1,0 +1,70 @@
+/* NetMon – custom styles */
+
+body {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    background: #f8f9fa;
+}
+
+.container-fluid {
+    flex: 1;
+    max-width: 1400px;
+}
+
+/* Status badges */
+.status-up   { color: #198754; font-weight: 600; }
+.status-down { color: #dc3545; font-weight: 600; }
+.status-unknown { color: #6c757d; }
+
+/* Service cards on dashboard */
+.service-card {
+    transition: transform .15s, box-shadow .15s;
+    border-left: 4px solid #dee2e6;
+}
+.service-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,.1);
+}
+.service-card.up   { border-left-color: #198754; }
+.service-card.down { border-left-color: #dc3545; }
+
+/* Sparkline mini chart area */
+.sparkline-wrap { height: 40px; }
+
+/* Uptime bar */
+.uptime-bar {
+    height: 8px;
+    border-radius: 4px;
+    background: linear-gradient(to right, #198754, #51cf66);
+}
+.uptime-bar.low { background: linear-gradient(to right, #dc3545, #ff6b6b); }
+
+/* History table row coloring */
+tr.status-up   td:first-child { border-left: 3px solid #198754; }
+tr.status-down td:first-child { border-left: 3px solid #dc3545; }
+
+/* Responsive table scroll */
+.table-responsive { overflow-x: auto; }
+
+/* Settings form */
+.settings-section {
+    background: #fff;
+    border: 1px solid #dee2e6;
+    border-radius: .5rem;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+/* Ping/latency color coding */
+.rt-good  { color: #198754; }
+.rt-ok    { color: #fd7e14; }
+.rt-slow  { color: #dc3545; }
+
+/* Pulse indicator for live services */
+@keyframes pulse {
+    0%   { opacity: 1; }
+    50%  { opacity: .4; }
+    100% { opacity: 1; }
+}
+.pulse { animation: pulse 2s infinite; }

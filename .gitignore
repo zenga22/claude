@@ -1,0 +1,13 @@
+# SQLite database
+data/*.db
+data/*.db-shm
+data/*.db-wal
+
+# Environment / secrets
+.env
+
+# Editor files
+.idea/
+.vscode/
+*.swp
+*~

@@ -1,0 +1,15 @@
+# NetMon – Apache configuration
+
+# Prevent directory listing
+Options -Indexes
+
+# Deny access to the data directory (SQLite DB)
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteRule ^data/  - [F,L]
+</IfModule>
+
+# Deny access to includes directory
+<FilesMatch "^(db|includes)">
+    Require all denied
+</FilesMatch>
