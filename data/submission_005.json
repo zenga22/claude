@@ -1,0 +1,21 @@
+{
+    "date-submitted": "2026-03-13 10:00:00",
+    "name": "Eva Nguyen",
+    "email": "eva.nguyen@example.com",
+    "phone": "+1-555-0505",
+    "department": "Design",
+    "subject": "Brand Refresh Assets",
+    "message": "Sharing the final brand refresh package including logos, colors, and typography guidelines.",
+    "priority": "medium",
+    "attachments": ["brand_guide_v3.pdf", "logo_pack.zip", "fonts.zip"],
+    "tags": ["design", "brand", "assets"],
+    "version": "3.0",
+    "approved_by": "Sarah Connor",
+    "metadata": {
+        "ip_address": "192.168.5.50",
+        "user_agent": "Edge/121.0",
+        "referrer": "https://example.com/design"
+    },
+    "agreed_to_terms": true,
+    "rating": 5
+}

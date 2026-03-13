@@ -1,0 +1,22 @@
+{
+    "date-submitted": "2026-03-12 17:45:59",
+    "name": "David Kim",
+    "email": "david.kim@example.com",
+    "phone": "+1-555-0404",
+    "department": "Finance",
+    "subject": "Budget Review Request",
+    "message": "Please review the attached budget projection for fiscal year 2027.",
+    "priority": "high",
+    "attachments": ["budget_2027.xlsx", "notes.docx"],
+    "tags": ["finance", "budget", "review"],
+    "fiscal_year": 2027,
+    "amount_requested": 250000.00,
+    "currency": "USD",
+    "metadata": {
+        "ip_address": "10.10.10.20",
+        "user_agent": "Firefox/122.0",
+        "referrer": "https://example.com/finance"
+    },
+    "agreed_to_terms": true,
+    "rating": null
+}

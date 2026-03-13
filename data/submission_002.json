@@ -1,0 +1,19 @@
+{
+    "date-submitted": "2026-03-05 14:30:22",
+    "name": "Bob Martinez",
+    "email": "bob.martinez@example.com",
+    "phone": "+1-555-0202",
+    "department": "Marketing",
+    "subject": "Campaign Feedback",
+    "message": "The spring campaign exceeded our expectations by 40%. Here are the key findings.",
+    "priority": "medium",
+    "attachments": ["report_q1.pdf"],
+    "tags": ["marketing", "campaign", "feedback"],
+    "metadata": {
+        "ip_address": "10.0.0.55",
+        "user_agent": "Chrome/120.0",
+        "referrer": "https://example.com/dashboard"
+    },
+    "agreed_to_terms": true,
+    "rating": 4
+}

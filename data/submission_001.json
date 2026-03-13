@@ -1,0 +1,19 @@
+{
+    "date-submitted": "2026-03-01 09:15:00",
+    "name": "Alice Johnson",
+    "email": "alice.johnson@example.com",
+    "phone": "+1-555-0101",
+    "department": "Engineering",
+    "subject": "Project Proposal",
+    "message": "I would like to propose a new microservices architecture for our backend.",
+    "priority": "high",
+    "attachments": ["proposal.pdf", "diagrams.zip"],
+    "tags": ["architecture", "backend", "proposal"],
+    "metadata": {
+        "ip_address": "192.168.1.10",
+        "user_agent": "Mozilla/5.0",
+        "referrer": "https://example.com/contact"
+    },
+    "agreed_to_terms": true,
+    "rating": 5
+}

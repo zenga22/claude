@@ -1,0 +1,19 @@
+{
+    "date-submitted": "2026-03-10 08:05:11",
+    "name": "Carol Lee",
+    "email": "carol.lee@example.com",
+    "phone": null,
+    "department": "HR",
+    "subject": "Onboarding Checklist",
+    "message": "Attached is the updated onboarding checklist for Q2 new hires.",
+    "priority": "low",
+    "attachments": [],
+    "tags": ["hr", "onboarding"],
+    "metadata": {
+        "ip_address": "172.16.0.3",
+        "user_agent": "Safari/17.0",
+        "referrer": null
+    },
+    "agreed_to_terms": false,
+    "rating": 3
+}
