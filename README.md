@@ -1,4 +1,4 @@
-# JSON Files List/Display
+# JSON Submissions Viewer
 ### Files
 | File | Purpose |
 |---|---|
