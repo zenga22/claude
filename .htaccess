@@ -1,0 +1,13 @@
+# Protect sensitive files from direct web access
+
+# Deny access to PHP library files
+<FilesMatch "^(config\.php|config\.local\.php)$">
+    Require all denied
+</FilesMatch>
+
+# Protect the data directory
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteRule ^data/ - [F,L]
+    RewriteRule ^lib/  - [F,L]
+</IfModule>
