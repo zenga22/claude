@@ -221,15 +221,17 @@ function build_summaries(array $entries): array
  */
 function level_class(string $level): string
 {
-    return match (true) {
-        in_array($level, ['emerg', 'alert', 'crit'], true)  => 'level-crit',
-        $level === 'error'                                   => 'level-error',
-        $level === 'warn'                                    => 'level-warn',
-        $level === 'notice'                                  => 'level-notice',
-        $level === 'info'                                    => 'level-info',
-        $level === 'debug'                                   => 'level-debug',
-        default                                              => 'level-unknown',
-    };
+    if (in_array($level, ['emerg', 'alert', 'crit'], true)) {
+        return 'level-crit';
+    }
+    switch ($level) {
+        case 'error':  return 'level-error';
+        case 'warn':   return 'level-warn';
+        case 'notice': return 'level-notice';
+        case 'info':   return 'level-info';
+        case 'debug':  return 'level-debug';
+        default:       return 'level-unknown';
+    }
 }
 
 function h(string $str): string
