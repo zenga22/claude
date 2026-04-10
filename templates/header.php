@@ -35,6 +35,7 @@ $_base = $assetsBase ?? '';
                 <li class="nav-item"><a class="nav-link" href="<?= $_base ?>dashboard.php">Dashboard</a></li>
                 <li class="nav-item"><a class="nav-link" href="<?= $_base ?>events.php">Events</a></li>
                 <li class="nav-item"><a class="nav-link" href="<?= $_base ?>my-signups.php">My Signups</a></li>
+                <li class="nav-item"><a class="nav-link" href="<?= $_base ?>staffing.php">Staffing</a></li>
                 <?php if ($currentUser['is_admin']): ?>
                 <li class="nav-item dropdown">
                     <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">Admin</a>
