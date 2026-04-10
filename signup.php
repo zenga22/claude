@@ -64,7 +64,7 @@ if ($stmt->fetch()) {
 $stmt = $pdo->prepare('INSERT INTO signups (period_id, user_id) VALUES (:pid, :uid)');
 $stmt->execute(['pid' => $periodId, 'uid' => $user['id']]);
 
-// Fetch full user record for email
+// Fetch full user record for email (includes name)
 $stmt = $pdo->prepare('SELECT * FROM users WHERE id = :id');
 $stmt->execute(['id' => $user['id']]);
 $fullUser = $stmt->fetch();

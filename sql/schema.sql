@@ -8,6 +8,7 @@ USE staffing_events;
 CREATE TABLE users (
     id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     username VARCHAR(50) NOT NULL UNIQUE,
+    name VARCHAR(255) NOT NULL DEFAULT '',
     email VARCHAR(255) NOT NULL UNIQUE,
     password_hash VARCHAR(255) NOT NULL,
     is_admin TINYINT(1) NOT NULL DEFAULT 0,
@@ -60,14 +61,14 @@ CREATE TABLE signups (
 -- -------------------------------------------------------
 
 -- Default admin user (password: admin123)
-INSERT INTO users (username, email, password_hash, is_admin) VALUES
-('admin', 'admin@example.com', '$2y$12$rKOThvp7YybKaqxTgsiow.n64R77cJk6AiLCI2QvAPgP8axyfQQW2', 1);
+INSERT INTO users (username, name, email, password_hash, is_admin) VALUES
+('admin', 'Site Administrator', 'admin@example.com', '$2y$12$rKOThvp7YybKaqxTgsiow.n64R77cJk6AiLCI2QvAPgP8axyfQQW2', 1);
 
 -- Sample regular users (password: password123)
-INSERT INTO users (username, email, password_hash, is_admin) VALUES
-('jdoe',    'jdoe@example.com',    '$2y$12$aHeisQckSF0s1x7DnURRj.sRwQriHn8LterXiGfoX5l70quDnKuY2', 0),
-('jsmith',  'jsmith@example.com',  '$2y$12$aHeisQckSF0s1x7DnURRj.sRwQriHn8LterXiGfoX5l70quDnKuY2', 0),
-('mbrown',  'mbrown@example.com',  '$2y$12$aHeisQckSF0s1x7DnURRj.sRwQriHn8LterXiGfoX5l70quDnKuY2', 0);
+INSERT INTO users (username, name, email, password_hash, is_admin) VALUES
+('jdoe',    'John Doe',     'jdoe@example.com',    '$2y$12$aHeisQckSF0s1x7DnURRj.sRwQriHn8LterXiGfoX5l70quDnKuY2', 0),
+('jsmith',  'Jane Smith',   'jsmith@example.com',  '$2y$12$aHeisQckSF0s1x7DnURRj.sRwQriHn8LterXiGfoX5l70quDnKuY2', 0),
+('mbrown',  'Michael Brown', 'mbrown@example.com',  '$2y$12$aHeisQckSF0s1x7DnURRj.sRwQriHn8LterXiGfoX5l70quDnKuY2', 0);
 
 -- Sample event
 INSERT INTO events (title, event_date, location, description) VALUES

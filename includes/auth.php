@@ -26,6 +26,7 @@ function auth_login(string $username, string $password): ?array
         auth_start_session();
         $_SESSION['user_id']  = (int) $user['id'];
         $_SESSION['username'] = $user['username'];
+        $_SESSION['name']     = $user['name'];
         $_SESSION['is_admin'] = (bool) $user['is_admin'];
         return $user;
     }
@@ -56,6 +57,7 @@ function auth_require_login(): array
     return [
         'id'       => $_SESSION['user_id'],
         'username' => $_SESSION['username'],
+        'name'     => $_SESSION['name'] ?? '',
         'is_admin' => $_SESSION['is_admin'],
     ];
 }
@@ -82,6 +84,7 @@ function auth_current_user(): ?array
     return [
         'id'       => $_SESSION['user_id'],
         'username' => $_SESSION['username'],
+        'name'     => $_SESSION['name'] ?? '',
         'is_admin' => $_SESSION['is_admin'],
     ];
 }

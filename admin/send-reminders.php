@@ -24,7 +24,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         // Find signups for events on the target date that haven't received a reminder
         $stmt = db()->prepare('
-            SELECT s.id AS signup_id, u.username, u.email,
+            SELECT s.id AS signup_id, u.username, u.name, u.email,
                    e.title, e.event_date, e.location,
                    ef.function_name,
                    ep.start_time, ep.end_time
@@ -46,7 +46,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             foreach ($signups as $s) {
                 $ok = send_signup_reminder(
-                    ['username' => $s['username'], 'email' => $s['email']],
+                    ['username' => $s['username'], 'name' => $s['name'], 'email' => $s['email']],
                     ['title' => $s['title'], 'event_date' => $s['event_date'], 'location' => $s['location']],
                     ['function_name' => $s['function_name']],
                     ['start_time' => $s['start_time'], 'end_time' => $s['end_time']]
@@ -71,29 +71,36 @@ $pageTitle = 'Send Reminders';
 require_once __DIR__ . '/../templates/header.php';
 ?>
 
-<div class="mb-1"><a href="index.php">&larr; Back to Admin</a></div>
+<nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="index.php">Admin</a></li>
+        <li class="breadcrumb-item active">Send Reminders</li>
+    </ol>
+</nav>
 
-<div class="card">
-    <h1>Send Reminder Emails</h1>
-    <p class="text-muted mb-1">
-        Send reminder emails to all users signed up for events happening on a specific date.
-        Only users who haven't already received a reminder will be emailed.
-    </p>
+<div class="card shadow-sm">
+    <div class="card-body">
+        <h1 class="card-title h4 mb-2">Send Reminder Emails</h1>
+        <p class="text-muted">
+            Send reminder emails to all users signed up for events happening on a specific date.
+            Only users who haven't already received a reminder will be emailed.
+        </p>
 
-    <?php foreach ($results as $msg): ?>
-        <div class="alert alert-info"><?= htmlspecialchars($msg) ?></div>
-    <?php endforeach; ?>
+        <?php foreach ($results as $msg): ?>
+            <div class="alert alert-info"><?= htmlspecialchars($msg) ?></div>
+        <?php endforeach; ?>
 
-    <form method="post" action="send-reminders.php">
-        <?= csrf_field() ?>
-        <div class="form-group">
-            <label for="days_before">Send reminders for events happening in this many days:</label>
-            <input type="number" id="days_before" name="days_before" class="form-control"
-                   value="<?= REMINDER_DAYS_BEFORE ?>" min="0" max="30" style="max-width: 200px;">
-            <small class="text-muted">0 = today, 1 = tomorrow, etc.</small>
-        </div>
-        <button type="submit" class="btn btn-primary">Send Reminders</button>
-    </form>
+        <form method="post" action="send-reminders.php">
+            <?= csrf_field() ?>
+            <div class="mb-3">
+                <label for="days_before" class="form-label">Send reminders for events happening in this many days:</label>
+                <input type="number" id="days_before" name="days_before" class="form-control"
+                       value="<?= REMINDER_DAYS_BEFORE ?>" min="0" max="30" style="max-width: 200px;">
+                <div class="form-text">0 = today, 1 = tomorrow, etc.</div>
+            </div>
+            <button type="submit" class="btn btn-primary">Send Reminders</button>
+        </form>
+    </div>
 </div>
 
 <?php require_once __DIR__ . '/../templates/footer.php'; ?>

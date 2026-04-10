@@ -41,7 +41,8 @@ function send_signup_confirmation(array $user, array $event, array $functionInfo
 
     $html = '<!DOCTYPE html><html><body>';
     $html .= '<h2>Signup Confirmation</h2>';
-    $html .= '<p>Hello ' . htmlspecialchars($user['username']) . ',</p>';
+    $displayName = !empty($user['name']) ? $user['name'] : $user['username'];
+    $html .= '<p>Hello ' . htmlspecialchars($displayName) . ',</p>';
     $html .= '<p>You have been signed up for the following:</p>';
     $html .= '<table border="1" cellpadding="8" cellspacing="0">';
     $html .= '<tr><td><strong>Event</strong></td><td>' . htmlspecialchars($event['title']) . '</td></tr>';
@@ -70,7 +71,8 @@ function send_signup_reminder(array $user, array $event, array $functionInfo, ar
 
     $html = '<!DOCTYPE html><html><body>';
     $html .= '<h2>Event Reminder</h2>';
-    $html .= '<p>Hello ' . htmlspecialchars($user['username']) . ',</p>';
+    $displayName = !empty($user['name']) ? $user['name'] : $user['username'];
+    $html .= '<p>Hello ' . htmlspecialchars($displayName) . ',</p>';
     $html .= '<p>This is a reminder that you are signed up for:</p>';
     $html .= '<table border="1" cellpadding="8" cellspacing="0">';
     $html .= '<tr><td><strong>Event</strong></td><td>' . htmlspecialchars($event['title']) . '</td></tr>';

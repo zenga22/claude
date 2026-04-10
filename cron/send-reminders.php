@@ -27,7 +27,7 @@ $targetDate = date('Y-m-d', strtotime("+{$daysBefore} days"));
 echo "Sending reminders for events on {$targetDate}...\n";
 
 $stmt = db()->prepare('
-    SELECT s.id AS signup_id, u.username, u.email,
+    SELECT s.id AS signup_id, u.username, u.name, u.email,
            e.title, e.event_date, e.location,
            ef.function_name,
            ep.start_time, ep.end_time
@@ -53,7 +53,7 @@ $failed = 0;
 
 foreach ($signups as $s) {
     $ok = send_signup_reminder(
-        ['username' => $s['username'], 'email' => $s['email']],
+        ['username' => $s['username'], 'name' => $s['name'], 'email' => $s['email']],
         ['title' => $s['title'], 'event_date' => $s['event_date'], 'location' => $s['location']],
         ['function_name' => $s['function_name']],
         ['start_time' => $s['start_time'], 'end_time' => $s['end_time']]

@@ -1,8 +1,11 @@
 </main>
-<footer class="site-footer">
+
+<footer class="bg-dark text-secondary text-center py-3 mt-auto">
     <div class="container">
-        <p>&copy; <?= date('Y') ?> <?= htmlspecialchars(APP_NAME) ?></p>
+        <small>&copy; <?= date('Y') ?> <?= htmlspecialchars(APP_NAME) ?></small>
     </div>
 </footer>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

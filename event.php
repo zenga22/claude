@@ -51,23 +51,28 @@ $pageTitle = $event['title'];
 require_once __DIR__ . '/templates/header.php';
 ?>
 
-<div class="mb-1">
-    <a href="events.php">&larr; Back to Events</a>
-</div>
+<nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="events.php">Events</a></li>
+        <li class="breadcrumb-item active"><?= htmlspecialchars($event['title']) ?></li>
+    </ol>
+</nav>
 
-<div class="card">
-    <h1><?= htmlspecialchars($event['title']) ?></h1>
-    <p class="event-date"><?= date('l, F j, Y', strtotime($event['event_date'])) ?></p>
-    <p class="event-location"><?= htmlspecialchars($event['location']) ?></p>
-    <?php if ($event['description']): ?>
-        <p class="mt-1"><?= nl2br(htmlspecialchars($event['description'])) ?></p>
-    <?php endif; ?>
+<div class="card shadow-sm mb-4">
+    <div class="card-body">
+        <h1 class="card-title"><?= htmlspecialchars($event['title']) ?></h1>
+        <p class="text-muted mb-1"><?= date('l, F j, Y', strtotime($event['event_date'])) ?></p>
+        <p class="text-muted mb-2"><?= htmlspecialchars($event['location']) ?></p>
+        <?php if ($event['description']): ?>
+            <p class="mt-2"><?= nl2br(htmlspecialchars($event['description'])) ?></p>
+        <?php endif; ?>
+    </div>
 </div>
 
 <?php if ($success === 'signup'): ?>
-    <div class="alert alert-success">You have been signed up successfully! A confirmation email has been sent.</div>
+    <div class="alert alert-success alert-dismissible fade show">You have been signed up successfully! A confirmation email has been sent.<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
 <?php elseif ($success === 'cancel'): ?>
-    <div class="alert alert-info">Your signup has been cancelled.</div>
+    <div class="alert alert-info alert-dismissible fade show">Your signup has been cancelled.<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
 <?php endif; ?>
 
 <?php if ($error === 'full'): ?>
@@ -81,72 +86,77 @@ require_once __DIR__ . '/templates/header.php';
 <?php endif; ?>
 
 <?php if (empty($functions)): ?>
-    <div class="card"><p class="text-muted">No functions have been defined for this event yet.</p></div>
+    <div class="card shadow-sm"><div class="card-body"><p class="text-muted mb-0">No functions have been defined for this event yet.</p></div></div>
 <?php endif; ?>
 
 <?php foreach ($functions as $fn): ?>
-<div class="card">
-    <h2><?= htmlspecialchars($fn['function_name']) ?></h2>
-    <?php if ($fn['description']): ?>
-        <p class="text-muted mb-1"><?= htmlspecialchars($fn['description']) ?></p>
-    <?php endif; ?>
-
-    <?php $periods = $functionPeriods[$fn['id']] ?? []; ?>
-    <?php if (empty($periods)): ?>
-        <p class="text-muted">No time periods defined.</p>
-    <?php else: ?>
-        <table>
-            <thead>
-                <tr>
-                    <th>Time Period</th>
-                    <th>Availability</th>
-                    <th>Action</th>
-                </tr>
-            </thead>
-            <tbody>
-            <?php foreach ($periods as $p): ?>
-                <?php
-                    $start     = date('g:i A', strtotime($p['start_time']));
-                    $end       = date('g:i A', strtotime($p['end_time']));
-                    $remaining = $p['max_signups'] - $p['signup_count'];
-                    $signedUp  = !empty($p['user_signup_id']);
-                ?>
-                <tr>
-                    <td><?= $start ?> &ndash; <?= $end ?></td>
-                    <td>
-                        <?php if ($signedUp): ?>
-                            <span class="slot-signed-up">Signed Up</span>
-                        <?php elseif ($remaining > 0): ?>
-                            <span class="slot-available"><?= $remaining ?> of <?= $p['max_signups'] ?> available</span>
-                        <?php else: ?>
-                            <span class="slot-full">Full</span>
-                        <?php endif; ?>
-                    </td>
-                    <td>
-                        <?php if ($signedUp): ?>
-                            <form method="post" action="cancel-signup.php" style="display:inline">
-                                <?= csrf_field() ?>
-                                <input type="hidden" name="signup_id" value="<?= $p['user_signup_id'] ?>">
-                                <input type="hidden" name="event_id" value="<?= $eventId ?>">
-                                <button type="submit" class="btn btn-danger btn-sm"
-                                        onclick="return confirm('Cancel this signup?')">Cancel</button>
-                            </form>
-                        <?php elseif ($remaining > 0): ?>
-                            <form method="post" action="signup.php" style="display:inline">
-                                <?= csrf_field() ?>
-                                <input type="hidden" name="period_id" value="<?= $p['id'] ?>">
-                                <input type="hidden" name="event_id" value="<?= $eventId ?>">
-                                <button type="submit" class="btn btn-success btn-sm">Sign Up</button>
-                            </form>
-                        <?php else: ?>
-                            <span class="text-muted">&mdash;</span>
-                        <?php endif; ?>
-                    </td>
-                </tr>
-            <?php endforeach; ?>
-            </tbody>
-        </table>
-    <?php endif; ?>
+<div class="card shadow-sm mb-3">
+    <div class="card-header bg-light">
+        <h5 class="mb-0"><?= htmlspecialchars($fn['function_name']) ?></h5>
+        <?php if ($fn['description']): ?>
+            <small class="text-muted"><?= htmlspecialchars($fn['description']) ?></small>
+        <?php endif; ?>
+    </div>
+    <div class="card-body p-0">
+        <?php $periods = $functionPeriods[$fn['id']] ?? []; ?>
+        <?php if (empty($periods)): ?>
+            <p class="text-muted p-3 mb-0">No time periods defined.</p>
+        <?php else: ?>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Time Period</th>
+                            <th>Availability</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    <?php foreach ($periods as $p): ?>
+                        <?php
+                            $start     = date('g:i A', strtotime($p['start_time']));
+                            $end       = date('g:i A', strtotime($p['end_time']));
+                            $remaining = $p['max_signups'] - $p['signup_count'];
+                            $signedUp  = !empty($p['user_signup_id']);
+                        ?>
+                        <tr>
+                            <td><?= $start ?> &ndash; <?= $end ?></td>
+                            <td>
+                                <?php if ($signedUp): ?>
+                                    <span class="badge bg-primary">Signed Up</span>
+                                <?php elseif ($remaining > 0): ?>
+                                    <span class="slot-available"><?= $remaining ?> of <?= $p['max_signups'] ?> available</span>
+                                <?php else: ?>
+                                    <span class="badge bg-danger">Full</span>
+                                <?php endif; ?>
+                            </td>
+                            <td>
+                                <?php if ($signedUp): ?>
+                                    <form method="post" action="cancel-signup.php" class="d-inline">
+                                        <?= csrf_field() ?>
+                                        <input type="hidden" name="signup_id" value="<?= $p['user_signup_id'] ?>">
+                                        <input type="hidden" name="event_id" value="<?= $eventId ?>">
+                                        <button type="submit" class="btn btn-outline-danger btn-sm"
+                                                onclick="return confirm('Cancel this signup?')">Cancel</button>
+                                    </form>
+                                <?php elseif ($remaining > 0): ?>
+                                    <form method="post" action="signup.php" class="d-inline">
+                                        <?= csrf_field() ?>
+                                        <input type="hidden" name="period_id" value="<?= $p['id'] ?>">
+                                        <input type="hidden" name="event_id" value="<?= $eventId ?>">
+                                        <button type="submit" class="btn btn-success btn-sm">Sign Up</button>
+                                    </form>
+                                <?php else: ?>
+                                    <span class="text-muted">&mdash;</span>
+                                <?php endif; ?>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+        <?php endif; ?>
+    </div>
 </div>
 <?php endforeach; ?>
 
