@@ -66,6 +66,11 @@ require_once __DIR__ . '/../templates/header.php';
                                     <a href="event-form.php?id=<?= $ev['id'] ?>" class="btn btn-outline-secondary">Edit</a>
                                     <a href="event-report.php?id=<?= $ev['id'] ?>" class="btn btn-outline-info">Report</a>
                                 </div>
+                                <form method="post" action="event-copy.php" class="d-inline ms-1">
+                                    <?= csrf_field() ?>
+                                    <input type="hidden" name="id" value="<?= $ev['id'] ?>">
+                                    <button type="submit" class="btn btn-outline-success btn-sm">Copy</button>
+                                </form>
                                 <form method="post" action="event-delete.php" class="d-inline ms-1">
                                     <?= csrf_field() ?>
                                     <input type="hidden" name="id" value="<?= $ev['id'] ?>">

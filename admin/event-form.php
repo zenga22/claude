@@ -47,6 +47,10 @@ require_once __DIR__ . '/../templates/header.php';
     </ol>
 </nav>
 
+<?php if (!empty($_GET['copied'])): ?>
+    <div class="alert alert-success alert-dismissible fade show">Event copied successfully. Update the details below and save.<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
+<?php endif; ?>
+
 <div class="card shadow-sm">
     <div class="card-body">
         <h1 class="card-title h4 mb-3"><?= $isEdit ? 'Edit' : 'Create' ?> Event</h1>
