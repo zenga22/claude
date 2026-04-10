@@ -14,6 +14,9 @@ $isEdit  = $eventId > 0;
 $event     = ['title' => '', 'event_date' => '', 'location' => '', 'description' => ''];
 $functions = [];
 
+// All available roles for the role picker
+$allRoles = db()->query('SELECT * FROM roles ORDER BY role_name')->fetchAll();
+
 if ($isEdit) {
     $stmt = db()->prepare('SELECT * FROM events WHERE id = :id');
     $stmt->execute(['id' => $eventId]);
@@ -23,7 +26,7 @@ if ($isEdit) {
         exit;
     }
 
-    // Load functions and their periods
+    // Load functions and their periods + assigned roles
     $stmt = db()->prepare('SELECT * FROM event_functions WHERE event_id = :eid ORDER BY id');
     $stmt->execute(['eid' => $eventId]);
     $fns = $stmt->fetchAll();
@@ -32,6 +35,11 @@ if ($isEdit) {
         $stmt = db()->prepare('SELECT * FROM event_periods WHERE function_id = :fid ORDER BY start_time');
         $stmt->execute(['fid' => $fn['id']]);
         $fn['periods'] = $stmt->fetchAll();
+
+        $stmt = db()->prepare('SELECT role_id FROM event_function_roles WHERE function_id = :fid');
+        $stmt->execute(['fid' => $fn['id']]);
+        $fn['role_ids'] = array_column($stmt->fetchAll(), 'role_id');
+
         $functions[] = $fn;
     }
 }
@@ -86,7 +94,7 @@ require_once __DIR__ . '/../templates/header.php';
 
             <hr>
             <h5>Functions &amp; Time Periods</h5>
-            <p class="text-muted small">Define the roles/positions for this event and their time slots.</p>
+            <p class="text-muted small">Define the roles/positions for this event and their time slots. Optionally restrict each function to specific roles.</p>
 
             <div id="functions-container">
                 <?php if (!empty($functions)): ?>
@@ -97,15 +105,23 @@ require_once __DIR__ . '/../templates/header.php';
                             <button type="button" class="btn btn-outline-danger btn-sm" onclick="this.closest('.function-block').remove()">Remove</button>
                         </div>
                         <div class="row">
-                            <div class="col-md-5 mb-3">
+                            <div class="col-md-4 mb-3">
                                 <label class="form-label">Function Name</label>
                                 <input type="text" name="functions[<?= $fi ?>][name]" class="form-control"
                                        value="<?= htmlspecialchars($fn['function_name']) ?>" required>
                             </div>
-                            <div class="col-md-7 mb-3">
+                            <div class="col-md-4 mb-3">
                                 <label class="form-label">Description</label>
                                 <input type="text" name="functions[<?= $fi ?>][description]" class="form-control"
                                        value="<?= htmlspecialchars($fn['description'] ?? '') ?>">
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Restrict to Roles <small class="text-muted">(none = open to all)</small></label>
+                                <select name="functions[<?= $fi ?>][roles][]" class="form-select" multiple size="3">
+                                    <?php foreach ($allRoles as $r): ?>
+                                        <option value="<?= $r['id'] ?>" <?= in_array($r['id'], $fn['role_ids']) ? 'selected' : '' ?>><?= htmlspecialchars($r['role_name']) ?></option>
+                                    <?php endforeach; ?>
+                                </select>
                             </div>
                         </div>
 
@@ -151,16 +167,31 @@ require_once __DIR__ . '/../templates/header.php';
 
 <script>
 var funcIndex = <?= !empty($functions) ? count($functions) : 0 ?>;
+var allRolesJson = <?= json_encode($allRoles) ?>;
+
+function buildRoleSelect(fi, selectedIds) {
+    var html = '<select name="functions[' + fi + '][roles][]" class="form-select" multiple size="3">';
+    for (var i = 0; i < allRolesJson.length; i++) {
+        var r = allRolesJson[i];
+        var sel = selectedIds.indexOf(r.id) !== -1 ? ' selected' : '';
+        html += '<option value="' + r.id + '"' + sel + '>' + r.role_name + '</option>';
+    }
+    html += '</select>';
+    return html;
+}
 
 document.getElementById('addFunctionBtn').addEventListener('click', function() {
+    var roleSelect = buildRoleSelect(funcIndex, []);
     var html = '<div class="function-block" data-index="' + funcIndex + '">' +
         '<div class="d-flex justify-content-between align-items-center mb-2">' +
         '<h6 class="mb-0">Function #' + (funcIndex + 1) + '</h6>' +
         '<button type="button" class="btn btn-outline-danger btn-sm" onclick="this.closest(\'.function-block\').remove()">Remove</button></div>' +
-        '<div class="row"><div class="col-md-5 mb-3"><label class="form-label">Function Name</label>' +
+        '<div class="row"><div class="col-md-4 mb-3"><label class="form-label">Function Name</label>' +
         '<input type="text" name="functions[' + funcIndex + '][name]" class="form-control" required></div>' +
-        '<div class="col-md-7 mb-3"><label class="form-label">Description</label>' +
-        '<input type="text" name="functions[' + funcIndex + '][description]" class="form-control"></div></div>' +
+        '<div class="col-md-4 mb-3"><label class="form-label">Description</label>' +
+        '<input type="text" name="functions[' + funcIndex + '][description]" class="form-control"></div>' +
+        '<div class="col-md-4 mb-3"><label class="form-label">Restrict to Roles <small class="text-muted">(none = open to all)</small></label>' +
+        roleSelect + '</div></div>' +
         '<label class="form-label fw-semibold">Time Periods</label>' +
         '<div class="periods-container"></div>' +
         '<button type="button" class="btn btn-outline-secondary btn-sm mt-1" onclick="addPeriod(this)">+ Add Period</button></div>';

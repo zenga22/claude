@@ -64,6 +64,15 @@ try {
         ]);
         $newFnId = (int) $pdo->lastInsertId();
 
+        // Copy role restrictions for this function
+        $rStmt = $pdo->prepare('SELECT role_id FROM event_function_roles WHERE function_id = :fid');
+        $rStmt->execute(['fid' => $fn['id']]);
+        $roleIds = $rStmt->fetchAll();
+        foreach ($roleIds as $r) {
+            $pdo->prepare('INSERT INTO event_function_roles (function_id, role_id) VALUES (:fid, :rid)')
+                ->execute(['fid' => $newFnId, 'rid' => $r['role_id']]);
+        }
+
         // Copy periods for this function
         $pStmt = $pdo->prepare('SELECT * FROM event_periods WHERE function_id = :fid ORDER BY start_time');
         $pStmt->execute(['fid' => $fn['id']]);

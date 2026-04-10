@@ -64,6 +64,16 @@ try {
         $stmt->execute(['eid' => $eventId, 'name' => $fnName, 'desc' => $fnDesc]);
         $fnId = (int) $pdo->lastInsertId();
 
+        // Insert role restrictions for this function
+        $roleIds = $fnData['roles'] ?? [];
+        foreach ($roleIds as $rid) {
+            $rid = (int) $rid;
+            if ($rid > 0) {
+                $stmt = $pdo->prepare('INSERT INTO event_function_roles (function_id, role_id) VALUES (:fid, :rid)');
+                $stmt->execute(['fid' => $fnId, 'rid' => $rid]);
+            }
+        }
+
         $periods = $fnData['periods'] ?? [];
         foreach ($periods as $pData) {
             $start = trim($pData['start'] ?? '');

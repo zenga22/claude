@@ -28,6 +28,7 @@ function auth_login(string $username, string $password): ?array
         $_SESSION['username'] = $user['username'];
         $_SESSION['name']     = $user['name'];
         $_SESSION['is_admin'] = (bool) $user['is_admin'];
+        $_SESSION['role_ids'] = auth_load_role_ids((int) $user['id']);
         return $user;
     }
     return null;
@@ -59,6 +60,7 @@ function auth_require_login(): array
         'username' => $_SESSION['username'],
         'name'     => $_SESSION['name'] ?? '',
         'is_admin' => $_SESSION['is_admin'],
+        'role_ids' => $_SESSION['role_ids'] ?? [],
     ];
 }
 
@@ -86,7 +88,29 @@ function auth_current_user(): ?array
         'username' => $_SESSION['username'],
         'name'     => $_SESSION['name'] ?? '',
         'is_admin' => $_SESSION['is_admin'],
+        'role_ids' => $_SESSION['role_ids'] ?? [],
     ];
+}
+
+/**
+ * Load role IDs for a user from the database.
+ */
+function auth_load_role_ids(int $userId): array
+{
+    $stmt = db()->prepare('SELECT role_id FROM user_roles WHERE user_id = :uid');
+    $stmt->execute(['uid' => $userId]);
+    return array_column($stmt->fetchAll(), 'role_id');
+}
+
+/**
+ * Refresh the role IDs cached in the current session (call after role changes).
+ */
+function auth_refresh_roles(): void
+{
+    auth_start_session();
+    if (!empty($_SESSION['user_id'])) {
+        $_SESSION['role_ids'] = auth_load_role_ids((int) $_SESSION['user_id']);
+    }
 }
 
 /**

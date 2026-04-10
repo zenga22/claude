@@ -47,6 +47,19 @@ if (!$period) {
     exit;
 }
 
+// Enforce role restrictions: check if the function requires specific roles
+$stmt = $pdo->prepare('SELECT role_id FROM event_function_roles WHERE function_id = :fid');
+$stmt->execute(['fid' => $period['fn_id']]);
+$requiredRoleIds = array_column($stmt->fetchAll(), 'role_id');
+
+if (!empty($requiredRoleIds)) {
+    $userRoleIds = $user['role_ids'] ?? [];
+    if (empty(array_intersect($userRoleIds, $requiredRoleIds))) {
+        header("Location: event.php?id=$eventId&error=role");
+        exit;
+    }
+}
+
 if ($period['signup_count'] >= $period['max_signups']) {
     header("Location: event.php?id=$eventId&error=full");
     exit;

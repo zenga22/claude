@@ -38,6 +38,11 @@ if ($event) {
         $stmt->execute(['fid' => $fn['id']]);
         $periods = $stmt->fetchAll();
 
+        // Load role restrictions for this function
+        $rStmt = db()->prepare('SELECT r.role_name FROM event_function_roles efr JOIN roles r ON efr.role_id = r.id WHERE efr.function_id = :fid ORDER BY r.role_name');
+        $rStmt->execute(['fid' => $fn['id']]);
+        $fn['role_names'] = array_column($rStmt->fetchAll(), 'role_name');
+
         $fnData = [
             'function'  => $fn,
             'periods'   => [],
@@ -160,7 +165,14 @@ require_once __DIR__ . '/../templates/header.php';
     <?php $fn = $fnBlock['function']; ?>
     <div class="card shadow-sm mb-3">
         <div class="card-header bg-light">
-            <h5 class="mb-0"><?= htmlspecialchars($fn['function_name']) ?></h5>
+            <h5 class="mb-0">
+                <?= htmlspecialchars($fn['function_name']) ?>
+                <?php if (!empty($fn['role_names'])): ?>
+                    <?php foreach ($fn['role_names'] as $rn): ?>
+                        <span class="badge bg-secondary ms-1" style="font-size: 0.7em;"><?= htmlspecialchars($rn) ?></span>
+                    <?php endforeach; ?>
+                <?php endif; ?>
+            </h5>
             <?php if ($fn['description']): ?>
                 <small class="text-muted"><?= htmlspecialchars($fn['description']) ?></small>
             <?php endif; ?>

@@ -43,6 +43,7 @@ $_base = $assetsBase ?? '';
                         <li><a class="dropdown-item" href="<?= $_base ?>admin/index.php">Dashboard</a></li>
                         <li><a class="dropdown-item" href="<?= $_base ?>admin/events.php">Manage Events</a></li>
                         <li><a class="dropdown-item" href="<?= $_base ?>admin/users.php">Manage Users</a></li>
+                        <li><a class="dropdown-item" href="<?= $_base ?>admin/roles.php">Manage Roles</a></li>
                         <li><a class="dropdown-item" href="<?= $_base ?>admin/event-report.php">Staffing Report</a></li>
                         <li><hr class="dropdown-divider"></li>
                         <li><a class="dropdown-item" href="<?= $_base ?>admin/send-reminders.php">Send Reminders</a></li>

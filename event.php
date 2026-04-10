@@ -26,7 +26,23 @@ if (!$event) {
 // Fetch functions for this event
 $stmt = db()->prepare('SELECT * FROM event_functions WHERE event_id = :eid ORDER BY id');
 $stmt->execute(['eid' => $eventId]);
-$functions = $stmt->fetchAll();
+$allFunctions = $stmt->fetchAll();
+
+// Load role restrictions for each function and filter by user's roles
+$userRoleIds = $user['role_ids'] ?? [];
+$functions = [];
+foreach ($allFunctions as $fn) {
+    $stmt = db()->prepare('SELECT role_id FROM event_function_roles WHERE function_id = :fid');
+    $stmt->execute(['fid' => $fn['id']]);
+    $requiredRoleIds = array_column($stmt->fetchAll(), 'role_id');
+    $fn['required_role_ids'] = $requiredRoleIds;
+
+    // If no role restrictions, open to all; otherwise check intersection
+    if (!empty($requiredRoleIds) && empty(array_intersect($userRoleIds, $requiredRoleIds))) {
+        continue; // user lacks required role
+    }
+    $functions[] = $fn;
+}
 
 // Fetch periods for each function, with signup counts and user's own signups
 $functionPeriods = [];
@@ -83,10 +99,18 @@ require_once __DIR__ . '/templates/header.php';
     <div class="alert alert-danger">Invalid request. Please try again.</div>
 <?php elseif ($error === 'csrf'): ?>
     <div class="alert alert-danger">Invalid form submission. Please try again.</div>
+<?php elseif ($error === 'role'): ?>
+    <div class="alert alert-danger">You do not have the required role to sign up for that function.</div>
 <?php endif; ?>
 
-<?php if (empty($functions)): ?>
+<?php if (empty($functions) && empty($allFunctions)): ?>
     <div class="card shadow-sm"><div class="card-body"><p class="text-muted mb-0">No functions have been defined for this event yet.</p></div></div>
+<?php elseif (empty($functions)): ?>
+    <div class="alert alert-info">There are no functions available for your current role(s). Contact an administrator if you believe this is an error.</div>
+<?php endif; ?>
+
+<?php if (count($functions) < count($allFunctions)): ?>
+    <div class="alert alert-info alert-dismissible fade show">Some functions are not shown because they require roles you don't have.<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
 <?php endif; ?>
 
 <?php foreach ($functions as $fn): ?>

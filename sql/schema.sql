@@ -56,6 +56,32 @@ CREATE TABLE signups (
     UNIQUE KEY unique_signup (period_id, user_id)
 ) ENGINE=InnoDB;
 
+-- Roles that can be assigned to users
+CREATE TABLE roles (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    role_name VARCHAR(100) NOT NULL UNIQUE
+) ENGINE=InnoDB;
+
+-- Many-to-many: users <-> roles
+CREATE TABLE user_roles (
+    user_id INT UNSIGNED NOT NULL,
+    role_id INT UNSIGNED NOT NULL,
+    PRIMARY KEY (user_id, role_id),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (role_id) REFERENCES roles(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+-- Many-to-many: event functions <-> required roles
+-- If no rows exist for a function, it is open to everyone.
+-- If rows exist, only users with at least one matching role may sign up.
+CREATE TABLE event_function_roles (
+    function_id INT UNSIGNED NOT NULL,
+    role_id INT UNSIGNED NOT NULL,
+    PRIMARY KEY (function_id, role_id),
+    FOREIGN KEY (function_id) REFERENCES event_functions(id) ON DELETE CASCADE,
+    FOREIGN KEY (role_id) REFERENCES roles(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
 -- -------------------------------------------------------
 -- Seed data
 -- -------------------------------------------------------
@@ -95,3 +121,17 @@ INSERT INTO event_periods (function_id, start_time, end_time, max_signups) VALUE
 INSERT INTO event_periods (function_id, start_time, end_time, max_signups) VALUES
 (3, '06:00:00', '08:00:00', 4),
 (3, '15:00:00', '17:00:00', 4);
+
+-- Sample roles
+INSERT INTO roles (role_name) VALUES
+('Volunteer'), ('Food Handler'), ('Coordinator');
+
+-- Assign roles to sample users
+INSERT INTO user_roles (user_id, role_id) VALUES
+(2, 1), (2, 2),  -- jdoe: Volunteer, Food Handler
+(3, 1), (3, 3),  -- jsmith: Volunteer, Coordinator
+(4, 1);           -- mbrown: Volunteer
+
+-- Restrict Food Service function to Food Handler role
+INSERT INTO event_function_roles (function_id, role_id) VALUES
+(2, 2);
