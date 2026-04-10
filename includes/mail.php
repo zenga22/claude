@@ -29,19 +29,28 @@ function send_mail(string $toAddress, string $toName, string $subject, string $h
 }
 
 /**
+ * Resolve the display name for a user array.
+ */
+function mail_display_name(array $user): string
+{
+    return !empty($user['name']) ? $user['name'] : $user['username'];
+}
+
+/**
  * Send a signup confirmation email.
  */
 function send_signup_confirmation(array $user, array $event, array $functionInfo, array $period): bool
 {
     $subject = 'Signup Confirmation: ' . $event['title'];
 
-    $date = date('l, F j, Y', strtotime($event['event_date']));
+    $displayName = mail_display_name($user);
+    $date  = date('l, F j, Y', strtotime($event['event_date']));
     $start = date('g:i A', strtotime($period['start_time']));
     $end   = date('g:i A', strtotime($period['end_time']));
+    $appLink = htmlspecialchars(APP_URL);
 
     $html = '<!DOCTYPE html><html><body>';
     $html .= '<h2>Signup Confirmation</h2>';
-    $displayName = !empty($user['name']) ? $user['name'] : $user['username'];
     $html .= '<p>Hello ' . htmlspecialchars($displayName) . ',</p>';
     $html .= '<p>You have been signed up for the following:</p>';
     $html .= '<table border="1" cellpadding="8" cellspacing="0">';
@@ -51,11 +60,12 @@ function send_signup_confirmation(array $user, array $event, array $functionInfo
     $html .= '<tr><td><strong>Function</strong></td><td>' . htmlspecialchars($functionInfo['function_name']) . '</td></tr>';
     $html .= '<tr><td><strong>Time</strong></td><td>' . $start . ' &ndash; ' . $end . '</td></tr>';
     $html .= '</table>';
-    $html .= '<p>If you need to cancel, please log in to the application.</p>';
+    $html .= '<p>If you need to cancel or view your signups, visit the application:<br>';
+    $html .= '<a href="' . $appLink . '">' . $appLink . '</a></p>';
     $html .= '<p>Thank you!</p>';
     $html .= '</body></html>';
 
-    return send_mail($user['email'], $user['username'], $subject, $html);
+    return send_mail($user['email'], $displayName, $subject, $html);
 }
 
 /**
@@ -65,13 +75,14 @@ function send_signup_reminder(array $user, array $event, array $functionInfo, ar
 {
     $subject = 'Reminder: ' . $event['title'] . ' is coming up!';
 
+    $displayName = mail_display_name($user);
     $date  = date('l, F j, Y', strtotime($event['event_date']));
     $start = date('g:i A', strtotime($period['start_time']));
     $end   = date('g:i A', strtotime($period['end_time']));
+    $appLink = htmlspecialchars(APP_URL);
 
     $html = '<!DOCTYPE html><html><body>';
     $html .= '<h2>Event Reminder</h2>';
-    $displayName = !empty($user['name']) ? $user['name'] : $user['username'];
     $html .= '<p>Hello ' . htmlspecialchars($displayName) . ',</p>';
     $html .= '<p>This is a reminder that you are signed up for:</p>';
     $html .= '<table border="1" cellpadding="8" cellspacing="0">';
@@ -81,8 +92,10 @@ function send_signup_reminder(array $user, array $event, array $functionInfo, ar
     $html .= '<tr><td><strong>Function</strong></td><td>' . htmlspecialchars($functionInfo['function_name']) . '</td></tr>';
     $html .= '<tr><td><strong>Time</strong></td><td>' . $start . ' &ndash; ' . $end . '</td></tr>';
     $html .= '</table>';
+    $html .= '<p>View your signups or manage your schedule:<br>';
+    $html .= '<a href="' . $appLink . '">' . $appLink . '</a></p>';
     $html .= '<p>We look forward to seeing you there!</p>';
     $html .= '</body></html>';
 
-    return send_mail($user['email'], $user['username'], $subject, $html);
+    return send_mail($user['email'], $displayName, $subject, $html);
 }
