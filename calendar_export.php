@@ -269,6 +269,18 @@ foreach ($events as $row) {
         $cal .= prop('X-EVENT-HOSTS', ics_escape($hosts));
     }
 
+    // GEO per RFC 5545 §3.8.1.6: "GEO:latitude;longitude"
+    // Both values are semicolon-separated signed decimal degrees.
+    $lat = $row['latitude']  ?? '';
+    $lon = $row['longitude'] ?? '';
+    if ($lat !== '' && $lat !== null && $lon !== '' && $lon !== null) {
+        $lat_f = (float) $lat;
+        $lon_f = (float) $lon;
+        if ($lat_f !== 0.0 || $lon_f !== 0.0) {
+            $cal .= prop('GEO', number_format($lat_f, 6) . ';' . number_format($lon_f, 6));
+        }
+    }
+
     $cal .= "END:VEVENT\r\n";
 }
 
