@@ -145,20 +145,16 @@ function dt_utc(string $mysql_dt): string
 }
 
 /**
- * Convert a MySQL TIME value (HH:MM:SS) to an ISO 8601 DURATION string.
- * Returns an empty string when the duration is zero (property is omitted).
+ * Compute DTEND by adding a MySQL TIME duration (HH:MM:SS) to a MySQL DATETIME
+ * start value, both interpreted as America/Denver local time.
+ * Output: YYYYMMDDTHHMMSS
  */
-function to_duration(string $mysql_time): string
+function dt_end(string $mysql_start, string $mysql_duration): string
 {
-    [$h, $m, $s] = array_map('intval', explode(':', $mysql_time));
-    if ($h === 0 && $m === 0 && $s === 0) {
-        return '';
-    }
-    $dur = 'PT';
-    if ($h) $dur .= "{$h}H";
-    if ($m) $dur .= "{$m}M";
-    if ($s) $dur .= "{$s}S";
-    return $dur;
+    [$h, $m, $s] = array_map('intval', explode(':', $mysql_duration));
+    $d = new DateTime($mysql_start, new DateTimeZone(TIMEZONE));
+    $d->add(new DateInterval(sprintf('PT%dH%dM%dS', $h, $m, $s)));
+    return $d->format('Ymd\THis');
 }
 
 /**
@@ -227,7 +223,6 @@ $cal .= "END:VTIMEZONE\r\n";
 $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
 
 foreach ($events as $row) {
-    $duration = to_duration($row['duration']);
     $location = build_location($row);
     $hosts    = trim($row['eventHosts']);
 
@@ -239,12 +234,8 @@ foreach ($events as $row) {
     // Required properties
     $cal .= prop('UID',           $uid);
     $cal .= prop('DTSTAMP',       dt_utc($row['updated']));   // UTC, per RFC 5545
-    $cal .= prop('DTSTART',       dt_local($row['time']), ['TZID' => TIMEZONE]);
-
-    // Duration (omitted when zero; event is then treated as zero-duration)
-    if ($duration !== '') {
-        $cal .= prop('DURATION', $duration);
-    }
+    $cal .= prop('DTSTART', dt_local($row['time']),               ['TZID' => TIMEZONE]);
+    $cal .= prop('DTEND',   dt_end($row['time'], $row['duration']), ['TZID' => TIMEZONE]);
 
     // Descriptive properties
     $cal .= prop('SUMMARY',       ics_escape($row['name']));
