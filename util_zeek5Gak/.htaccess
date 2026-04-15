@@ -1,0 +1,16 @@
+Options -Indexes
+
+# Block direct HTTP access to sensitive data files
+<FilesMatch "\.(json|env|example|log)$">
+    Require all denied
+</FilesMatch>
+
+# Also block the .env file itself
+<Files ".env">
+    Require all denied
+</Files>
+
+RewriteEngine On
+
+# Route /callback (no extension) → callback.php, preserving query string
+RewriteRule ^callback$ callback.php [L,QSA]
