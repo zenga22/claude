@@ -2,6 +2,10 @@
 """
 Meetup.com GraphQL Schema Fetcher
 Authenticates via OAuth2 and uses GraphQL introspection to retrieve and save the schema.
+
+Usage:
+  python meetup_graphql_schema.py            # auto mode: local callback server
+  python meetup_graphql_schema.py --manual   # manual mode: paste the redirect URL
 """
 
 import json
@@ -19,7 +23,8 @@ import requests
 MEETUP_AUTH_URL = "https://secure.meetup.com/oauth2/authorize"
 MEETUP_TOKEN_URL = "https://secure.meetup.com/oauth2/access"
 MEETUP_GRAPHQL_URL = "https://api.meetup.com/gql"
-REDIRECT_URI = "http://localhost:8080/callback"
+REDIRECT_URI_AUTO = "http://localhost:8080"    # register this in the Meetup OAuth consumer
+REDIRECT_URI_MANUAL = "http://localhost:8080"  # can be any URI you register; user pastes the redirect
 SCHEMA_OUTPUT_FILE = "meetup_schema.json"
 
 # Full introspection query (based on the GraphQL spec)
@@ -119,20 +124,14 @@ fragment TypeRef on __Type {
 
 
 class OAuthCallbackHandler(BaseHTTPRequestHandler):
-    """Handles the OAuth2 redirect callback."""
+    """Handles the OAuth2 redirect callback on any path."""
 
     auth_code = None
     error = None
     state_received = None
 
     def do_GET(self):
-        parsed = urlparse(self.path)
-        if parsed.path != "/callback":
-            self.send_response(404)
-            self.end_headers()
-            return
-
-        params = parse_qs(parsed.query)
+        params = parse_qs(urlparse(self.path).query)
 
         if "error" in params:
             OAuthCallbackHandler.error = params["error"][0]
@@ -149,9 +148,11 @@ class OAuthCallbackHandler(BaseHTTPRequestHandler):
                 "<p>You can close this tab and return to the terminal.</p>"
             )
         else:
-            self._send_html("<h2>Unexpected response</h2><p>No code or error received.</p>")
+            # Browser may request /favicon.ico etc. — ignore silently
+            self.send_response(204)
+            self.end_headers()
+            return
 
-        # Signal the server to stop after responding
         threading.Thread(target=self.server.shutdown, daemon=True).start()
 
     def _send_html(self, body: str):
@@ -167,67 +168,131 @@ class OAuthCallbackHandler(BaseHTTPRequestHandler):
         pass  # Suppress default request logging
 
 
-def run_oauth_flow(client_id: str, client_secret: str) -> str:
-    """
-    Runs the OAuth2 Authorization Code flow.
-    Opens a browser, waits for the redirect, and returns the access token.
-    """
-    state = secrets.token_urlsafe(16)
-
-    params = {
-        "client_id": client_id,
-        "response_type": "code",
-        "redirect_uri": REDIRECT_URI,
-        "scope": "basic",
-        "state": state,
-    }
-    auth_url = f"{MEETUP_AUTH_URL}?{urlencode(params)}"
-
-    print(f"\nOpening browser for Meetup OAuth2 authorization...")
-    print(f"If the browser does not open, visit:\n  {auth_url}\n")
-    webbrowser.open(auth_url)
-
-    # Start local callback server
-    server = HTTPServer(("localhost", 8080), OAuthCallbackHandler)
-    print("Waiting for OAuth2 callback on http://localhost:8080/callback ...")
-    server.serve_forever()  # Blocks until shutdown() is called in the handler
-
-    if OAuthCallbackHandler.error:
-        raise RuntimeError(f"OAuth2 authorization error: {OAuthCallbackHandler.error}")
-
-    if not OAuthCallbackHandler.auth_code:
-        raise RuntimeError("No authorization code received.")
-
-    if OAuthCallbackHandler.state_received != state:
-        raise RuntimeError(
-            f"State mismatch! Expected '{state}', got '{OAuthCallbackHandler.state_received}'. "
-            "Possible CSRF attack."
-        )
-
-    print("Authorization code received. Exchanging for access token...")
-
-    # Exchange authorization code for access token
+def _exchange_code_for_token(client_id: str, client_secret: str, code: str, redirect_uri: str) -> str:
+    """Exchanges an authorization code for an access token."""
     response = requests.post(
         MEETUP_TOKEN_URL,
         data={
             "client_id": client_id,
             "client_secret": client_secret,
             "grant_type": "authorization_code",
-            "redirect_uri": REDIRECT_URI,
-            "code": OAuthCallbackHandler.auth_code,
+            "redirect_uri": redirect_uri,
+            "code": code,
         },
         headers={"Accept": "application/json"},
         timeout=30,
     )
     response.raise_for_status()
-
     token_data = response.json()
     access_token = token_data.get("access_token")
     if not access_token:
         raise RuntimeError(f"No access_token in response: {token_data}")
+    return access_token
 
+
+def run_oauth_flow_auto(client_id: str, client_secret: str) -> str:
+    """
+    OAuth2 Authorization Code flow with a local callback server.
+    Register 'http://localhost:8080' as the Redirect URI in your Meetup OAuth consumer.
+    """
+    state = secrets.token_urlsafe(16)
+    redirect_uri = REDIRECT_URI_AUTO
+
+    params = {
+        "client_id": client_id,
+        "response_type": "code",
+        "redirect_uri": redirect_uri,
+        "scope": "basic",
+        "state": state,
+    }
+    auth_url = f"{MEETUP_AUTH_URL}?{urlencode(params)}"
+
+    print("\nOpening browser for Meetup OAuth2 authorization...")
+    print(f"If the browser does not open, visit:\n  {auth_url}\n")
+    webbrowser.open(auth_url)
+
+    server = HTTPServer(("localhost", 8080), OAuthCallbackHandler)
+    print(f"Waiting for OAuth2 callback on {redirect_uri} ...")
+    server.serve_forever()  # blocks until handler calls shutdown()
+
+    if OAuthCallbackHandler.error:
+        raise RuntimeError(f"OAuth2 authorization error: {OAuthCallbackHandler.error}")
+    if not OAuthCallbackHandler.auth_code:
+        raise RuntimeError("No authorization code received.")
+    if OAuthCallbackHandler.state_received != state:
+        raise RuntimeError(
+            f"State mismatch (expected '{state}', got '{OAuthCallbackHandler.state_received}'). "
+            "Possible CSRF attempt."
+        )
+
+    print("Authorization code received. Exchanging for access token...")
+    access_token = _exchange_code_for_token(
+        client_id, client_secret, OAuthCallbackHandler.auth_code, redirect_uri
+    )
     print("Access token obtained successfully.\n")
     return access_token
+
+
+def run_oauth_flow_manual(client_id: str, client_secret: str) -> str:
+    """
+    OAuth2 Authorization Code flow — manual / out-of-band.
+
+    Use this when Meetup rejects localhost redirect URIs.  Register any URI you
+    control (e.g. http://localhost:8080) in your Meetup OAuth consumer, then:
+      1. Visit the printed authorization URL.
+      2. After approving, your browser will be redirected to that URI with
+         ?code=... in the address bar.  Copy the full URL (or just the code)
+         and paste it when prompted.
+    """
+    state = secrets.token_urlsafe(16)
+    redirect_uri = REDIRECT_URI_MANUAL
+
+    params = {
+        "client_id": client_id,
+        "response_type": "code",
+        "redirect_uri": redirect_uri,
+        "scope": "basic",
+        "state": state,
+    }
+    auth_url = f"{MEETUP_AUTH_URL}?{urlencode(params)}"
+
+    print("\n--- Manual OAuth2 flow ---")
+    print("1. Open this URL in your browser:\n")
+    print(f"   {auth_url}\n")
+    print("2. Authorize the application.")
+    print(
+        "3. You will be redirected to a URL that looks like:\n"
+        f"   {redirect_uri}?code=XXXX&state=YYYY\n"
+        "   (The page may show an error — that is fine.)\n"
+    )
+
+    raw = input("Paste the full redirect URL (or just the 'code' value): ").strip()
+
+    # Accept either the full URL or a bare code
+    if raw.startswith("http"):
+        parsed_params = parse_qs(urlparse(raw).query)
+        code = parsed_params.get("code", [None])[0]
+        state_received = parsed_params.get("state", [None])[0]
+        if not code:
+            raise RuntimeError("Could not find 'code' parameter in the pasted URL.")
+        if state_received and state_received != state:
+            raise RuntimeError(
+                f"State mismatch (expected '{state}', got '{state_received}'). "
+                "Possible CSRF attempt."
+            )
+    else:
+        code = raw  # user pasted just the code
+
+    print("\nExchanging authorization code for access token...")
+    access_token = _exchange_code_for_token(client_id, client_secret, code, redirect_uri)
+    print("Access token obtained successfully.\n")
+    return access_token
+
+
+def run_oauth_flow(client_id: str, client_secret: str, manual: bool = False) -> str:
+    if manual:
+        return run_oauth_flow_manual(client_id, client_secret)
+    return run_oauth_flow_auto(client_id, client_secret)
 
 
 def fetch_graphql_schema(access_token: str) -> dict:
@@ -287,17 +352,22 @@ def get_credentials() -> tuple[str, str]:
 
 
 def main():
+    manual = "--manual" in sys.argv
+
     print("=== Meetup GraphQL Schema Fetcher ===")
+    redirect_uri = REDIRECT_URI_MANUAL if manual else REDIRECT_URI_AUTO
     print(
         "\nPrerequisite: Register an OAuth2 consumer at "
         "https://www.meetup.com/api/oauth/list/\n"
-        f"  Set Redirect URI to: {REDIRECT_URI}\n"
+        f"  Set Redirect URI to: {redirect_uri}\n"
     )
+    if not manual:
+        print("Tip: if Meetup rejects the redirect URI, re-run with --manual\n")
 
     client_id, client_secret = get_credentials()
 
     try:
-        access_token = run_oauth_flow(client_id, client_secret)
+        access_token = run_oauth_flow(client_id, client_secret, manual=manual)
         schema = fetch_graphql_schema(access_token)
         save_schema(schema, SCHEMA_OUTPUT_FILE)
 
