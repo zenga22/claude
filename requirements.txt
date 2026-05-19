@@ -1,0 +1,2 @@
+mysql-connector-python>=8.0
+sshtunnel>=0.4
