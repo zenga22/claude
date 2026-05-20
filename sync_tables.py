@@ -19,6 +19,9 @@ Modes:
 import argparse
 import configparser
 import logging
+import shutil
+import socket
+import subprocess
 import sys
 import time
 from contextlib import contextmanager
@@ -33,14 +36,6 @@ except ImportError:
     sys.exit(
         "ERROR: mysql-connector-python is not installed.\n"
         "  pip install mysql-connector-python"
-    )
-
-try:
-    from sshtunnel import SSHTunnelForwarder, BaseSSHTunnelForwarderError
-except ImportError:
-    sys.exit(
-        "ERROR: sshtunnel is not installed.\n"
-        "  pip install sshtunnel"
     )
 
 
@@ -172,50 +167,125 @@ def setup_logging(verbose):
 
 
 # ---------------------------------------------------------------------------
-# SSH tunnel context manager
+# SSH tunnel via OpenSSH subprocess
 # ---------------------------------------------------------------------------
+
+def _pick_free_local_port():
+    # type: () -> int
+    """Return an unused TCP port on 127.0.0.1."""
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        s.bind(("127.0.0.1", 0))
+        return s.getsockname()[1]
+    finally:
+        s.close()
+
+
+def _wait_for_port(host, port, timeout=15.0):
+    # type: (str, int, float) -> bool
+    """Block until *host:port* accepts TCP connections, or timeout."""
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        try:
+            sock = socket.create_connection((host, port), timeout=1.0)
+            sock.close()
+            return True
+        except (OSError, ConnectionRefusedError):
+            time.sleep(0.2)
+    return False
+
+
+def _build_ssh_command(cfg, local_port):
+    # type: (SyncConfig, int) -> List[str]
+    """Construct the OpenSSH command for a local port-forward tunnel."""
+    cmd = [
+        "ssh",
+        "-N",                                   # don't run a remote command
+        "-T",                                   # disable pseudo-tty
+        "-p", str(cfg.ssh_port),
+        "-L", "{}:{}:{}".format(local_port, cfg.remote_host, cfg.remote_port),
+        "-o", "ExitOnForwardFailure=yes",
+        "-o", "ServerAliveInterval=30",
+        "-o", "ServerAliveCountMax=3",
+        "-o", "StrictHostKeyChecking=accept-new",
+        "-o", "BatchMode=yes" if not cfg.ssh_password else "BatchMode=no",
+    ]
+    if cfg.ssh_key_file:
+        cmd += ["-i", cfg.ssh_key_file, "-o", "IdentitiesOnly=yes"]
+    cmd.append("{}@{}".format(cfg.ssh_username, cfg.ssh_host))
+    return cmd
+
 
 @contextmanager
 def open_tunnel(cfg):
     # type: (SyncConfig) -> Any
-    """Opens an SSH tunnel and yields the local port number."""
-    kwargs = {
-        "ssh_address_or_host": (cfg.ssh_host, cfg.ssh_port),
-        "ssh_username": cfg.ssh_username,
-        "remote_bind_address": (cfg.remote_host, cfg.remote_port),
-        # Allow SSH agent and ~/.ssh key discovery as automatic fallbacks
-        "allow_agent": True,
-        "host_pkey_directories": [str(Path("~/.ssh").expanduser())],
-    }  # type: Dict[str, Any]
-    if cfg.ssh_key_file:
-        kwargs["ssh_pkey"] = cfg.ssh_key_file
+    """Opens an SSH tunnel using the OpenSSH client and yields the local port."""
+    if shutil.which("ssh") is None:
+        sys.exit("ERROR: 'ssh' executable not found in PATH. Install OpenSSH client.")
+
+    local_port = _pick_free_local_port()
+
+    # If a password was supplied in config, route through sshpass when available
+    base_cmd = _build_ssh_command(cfg, local_port)
     if cfg.ssh_password:
-        kwargs["ssh_password"] = cfg.ssh_password
+        if shutil.which("sshpass") is None:
+            sys.exit(
+                "ERROR: ssh_password set in config but 'sshpass' is not installed.\n"
+                "  Either install sshpass (apt install sshpass) or switch to key-based auth."
+            )
+        cmd = ["sshpass", "-p", cfg.ssh_password] + base_cmd
+    else:
+        cmd = base_cmd
 
     auth_desc = (
         "key {}".format(cfg.ssh_key_file) if cfg.ssh_key_file
-        else "password" if cfg.ssh_password
-        else "SSH agent / ~/.ssh keys"
+        else "password (sshpass)" if cfg.ssh_password
+        else "SSH agent / ~/.ssh defaults"
     )
     print(
-        "Opening SSH tunnel  {}@{}:{} -> {}:{} (auth: {}) ...".format(
+        "Opening SSH tunnel  {}@{}:{} -> {}:{}  (local port {}, auth: {}) ...".format(
             cfg.ssh_username, cfg.ssh_host, cfg.ssh_port,
-            cfg.remote_host, cfg.remote_port, auth_desc,
+            cfg.remote_host, cfg.remote_port, local_port, auth_desc,
         )
     )
 
+    # Start ssh as a child process; capture stderr for diagnostics on failure
+    proc = subprocess.Popen(
+        cmd,
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.PIPE,
+    )
+
     try:
-        with SSHTunnelForwarder(**kwargs) as tunnel:
-            print("Tunnel open  (local port {})".format(tunnel.local_bind_port))
-            yield tunnel.local_bind_port
-    except BaseSSHTunnelForwarderError as exc:
-        sys.exit("SSH tunnel error: {}".format(exc))
-    except ValueError as exc:
-        sys.exit(
-            "SSH auth error: {}\n"
-            "Set key_file or password in [ssh] section of the config, "
-            "or ensure your SSH agent has keys loaded (ssh-add).".format(exc)
-        )
+        if not _wait_for_port("127.0.0.1", local_port, timeout=15.0):
+            # Tunnel never came up - kill ssh and report whatever it said
+            proc.terminate()
+            try:
+                _, stderr = proc.communicate(timeout=5)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+                _, stderr = proc.communicate()
+            sys.exit(
+                "SSH tunnel failed to open within 15s.\n"
+                "ssh stderr:\n{}".format(
+                    (stderr or b"").decode("utf-8", errors="replace").strip()
+                )
+            )
+
+        print("Tunnel open  (local port {})".format(local_port))
+        yield local_port
+
+    finally:
+        # Clean shutdown of the ssh client
+        if proc.poll() is None:
+            proc.terminate()
+            try:
+                proc.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+                proc.wait()
+        print("SSH tunnel closed.")
 
 
 # ---------------------------------------------------------------------------
