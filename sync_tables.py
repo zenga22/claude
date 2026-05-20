@@ -183,16 +183,24 @@ def open_tunnel(cfg):
         "ssh_address_or_host": (cfg.ssh_host, cfg.ssh_port),
         "ssh_username": cfg.ssh_username,
         "remote_bind_address": (cfg.remote_host, cfg.remote_port),
+        # Allow SSH agent and ~/.ssh key discovery as automatic fallbacks
+        "allow_agent": True,
+        "host_pkey_directories": [str(Path("~/.ssh").expanduser())],
     }  # type: Dict[str, Any]
     if cfg.ssh_key_file:
         kwargs["ssh_pkey"] = cfg.ssh_key_file
     if cfg.ssh_password:
         kwargs["ssh_password"] = cfg.ssh_password
 
+    auth_desc = (
+        "key {}".format(cfg.ssh_key_file) if cfg.ssh_key_file
+        else "password" if cfg.ssh_password
+        else "SSH agent / ~/.ssh keys"
+    )
     print(
-        "Opening SSH tunnel  {}@{}:{} -> {}:{} ...".format(
+        "Opening SSH tunnel  {}@{}:{} -> {}:{} (auth: {}) ...".format(
             cfg.ssh_username, cfg.ssh_host, cfg.ssh_port,
-            cfg.remote_host, cfg.remote_port,
+            cfg.remote_host, cfg.remote_port, auth_desc,
         )
     )
 
@@ -202,6 +210,12 @@ def open_tunnel(cfg):
             yield tunnel.local_bind_port
     except BaseSSHTunnelForwarderError as exc:
         sys.exit("SSH tunnel error: {}".format(exc))
+    except ValueError as exc:
+        sys.exit(
+            "SSH auth error: {}\n"
+            "Set key_file or password in [ssh] section of the config, "
+            "or ensure your SSH agent has keys loaded (ssh-add).".format(exc)
+        )
 
 
 # ---------------------------------------------------------------------------
