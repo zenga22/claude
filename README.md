@@ -13,3 +13,14 @@ A Python script that checks all EC2 Reserved Instances across one or more AWS re
 Code for this project is in the branch **claude/aws-reserved-instances-monitor-DmFzK**
 
 ---
+## XLSX to ODS Converter
+
+A dependency-free Python script (`xlsx_to_ods.py`) that converts an .xlsx workbook to .ods, auto-detecting which columns hold dates, currency amounts, or plain numbers (even when the source stores everything as text) and writing real typed, formatted cells in the output. Uses only the standard library.
+
+```
+python3 xlsx_to_ods.py input.xlsx [-o output.ods]
+```
+
+Code for this project is in the branch **claude/xlsx-ods-conversion-1avulr**
+
+---
